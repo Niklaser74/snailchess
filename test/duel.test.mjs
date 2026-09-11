@@ -2,7 +2,7 @@
 // duel is over within the tick budget, and the same capture replays the same.
 //   node test/duel.test.mjs
 import assert from 'node:assert/strict';
-import { createDuel, duelSeed, duelTheme, DUEL_WEAPONS } from '../js/duel.js';
+import { createDuel, duelSeed, duelTheme, hittingVariant, DUEL_WEAPONS } from '../js/duel.js';
 import { LOOKS } from '../js/pieces.js';
 
 let failed = 0;
@@ -59,6 +59,20 @@ test('weapons are limited to the piece and the arena is the small one', () => {
   assert.equal(d.defender.hp, 15);
   assert.equal(d.attacker.x, 230);
   assert.equal(d.defender.x, 670);
+});
+
+test('a shown duel never needs the salt: the hitting variant really hits, for every attacker type', () => {
+  let salted = 0, total = 0;
+  for (let m = 1; m <= 12; m++) for (const a of 'pnbrqk') {
+    const spec = { attacker: { type: a, color: m % 2 ? 'w' : 'b' }, defender: { type: 'p', color: m % 2 ? 'b' : 'w' }, from: 'e2', to: 'abcdefgh'[m % 8] + (1 + (m * 3) % 8), moveNo: m };
+    const v = hittingVariant(spec);
+    const d = play({ ...spec, variant: v });
+    total++;
+    if (d.forced) salted++;
+    assert.equal(d.result, 'attacker');
+    assert.equal(hittingVariant(spec), v, 'variant choice must be deterministic');
+  }
+  assert.equal(salted, 0, ` of  shown duels would have needed the salt`);
 });
 
 if (failed) { console.log(`\n${failed} test(s) failed`); process.exit(1); }

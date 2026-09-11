@@ -21,8 +21,8 @@ const MAX_TICKS = 60 * 45; // safety net: nothing in a duel takes longer than th
 const FILES = 'abcdefgh';
 
 // A well-mixed seed from the move, so the same capture always plays the same duel.
-export function duelSeed(moveNo, from, to) {
-  let h = 0x9e3779b1 ^ (moveNo * 64 + squareIndex(from));
+export function duelSeed(moveNo, from, to, variant = 0) {
+  let h = 0x9e3779b1 ^ (moveNo * 64 + squareIndex(from)) ^ Math.imul(variant + 1, 0x27d4eb2f);
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) ^ squareIndex(to);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   return (h ^ (h >>> 16)) & 0x7fffffff;
@@ -35,7 +35,7 @@ export function duelTheme(square) { return THEME_IDS[(squareIndex(square) % 3)];
 export function duelConfig(spec) {
   const look = (type) => ({ shell: 'spiral', hat: LOOKS[type].hat });
   return {
-    seed: duelSeed(spec.moveNo, spec.from, spec.to),
+    seed: duelSeed(spec.moveNo, spec.from, spec.to, spec.variant || 0),
     theme: duelTheme(spec.to),
     width: ARENA.width, height: ARENA.height,
     snailsPerTeam: 1,
@@ -52,7 +52,7 @@ export function duelConfig(spec) {
 // Builds the duel. canvas may be null (headless). Returns { game, attacker, defender, tick, done, result }.
 export function createDuel(canvas, spec) {
   const config = duelConfig(spec);
-  const duel = { game: null, attacker: null, defender: null, done: false, result: null };
+  const duel = { game: null, attacker: null, defender: null, done: false, result: null, forced: false };
   duel.game = new Game(canvas, config, {
     onGameOver: (winner) => { duel.done = true; duel.result = winner && winner.index === 0 ? 'attacker' : (winner ? 'defender' : 'draw'); },
   });
@@ -77,17 +77,31 @@ export function createDuel(canvas, spec) {
     const d = duel.defender;
     const settled = g.phase === 'settle' && g.projectiles.length === 0 && g.pendingBooms.length === 0;
     const overdue = g.tickCount > MAX_TICKS || (g.hasFired && settled) || g.turnCount > 1;
-    if (overdue && d.alive && d.hp > 0) { g.say({ key: 'duel.salt', name: d.name }, 2); g.damage(d, 999, 'salt'); }
+    if (overdue && d.alive && d.hp > 0) { duel.forced = true; g.say({ key: 'duel.salt', name: d.name }, 2); g.damage(d, 999, 'salt'); }
     if (g.tickCount > MAX_TICKS + 120 && !duel.done) { duel.done = true; duel.result = 'attacker'; }
   };
   return duel;
+}
+
+// A shown shot must never miss. The duel is deterministic per seed, so try
+// variants headlessly (a few milliseconds each) and pick the first one where
+// the shot itself finishes the defender, without the salt. Deterministic too,
+// so another device replaying the same capture picks the same variant.
+export function hittingVariant(spec, maxTries = 16) {
+  for (let v = 0; v < maxTries; v++) {
+    const d = createDuel(null, { ...spec, variant: v });
+    let n = 0;
+    while (!d.done && n++ < MAX_TICKS + 200) d.tick();
+    if (d.done && !d.forced) return v;
+  }
+  return 0; // give up: the salt will do it
 }
 
 // Browser driver: runs the duel on a canvas at real speed and resolves when it
 // is over (plus a moment to look at the empty shell). onSkip() from the UI
 // fast-forwards headlessly.
 export function runDuel(canvas, spec, { holdMs = 2000 } = {}) {
-  const duel = createDuel(canvas, spec);
+  const duel = createDuel(canvas, { ...spec, variant: spec.variant ?? hittingVariant(spec) });
   const TICK = 1 / 60;
   let raf = 0, last = 0, acc = 0, skipped = false, finished = false;
   const ctl = { duel, promise: null, skip: null };

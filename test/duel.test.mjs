@@ -90,5 +90,23 @@ test('battle mode (mustWin false): a miss is a miss, no salt, and hits are still
   assert.ok(hit > miss * 2, `hits  should clearly outnumber misses `);
 });
 
+test('kaos: both shoot, hp carries in, the duel ends with a winner (or both gone) within the budget', () => {
+  const res = { attacker: 0, defender: 0, draw: 0 };
+  for (let m = 1; m <= 16; m++) {
+    const d = createDuel(null, { attacker: { type: 'p', color: 'w' }, defender: { type: 'q', color: 'b' }, from: 'c4', to: 'abcdefgh'[m % 8] + (1 + (m * 3) % 8), moveNo: m }, { mustWin: false, kaos: { attackerHp: 60, defenderHp: 25 } });
+    assert.equal(d.attacker.hp, 60); assert.equal(d.defender.hp, 25);
+    assert.ok(d.game.teams[1].ai, 'the defender shoots back in kaos');
+    assert.equal(d.game.teams[1].ammo.bazooka, Infinity, 'everyone gets the bazooka in kaos');
+    let n = 0;
+    while (!d.done && n++ < 60 * 200) d.tick();
+    assert.ok(d.done, 'kaos duel must end');
+    assert.equal(d.forced, false);
+    res[d.result]++;
+    if (d.result === 'attacker') assert.ok(!d.defender.alive && d.attacker.alive);
+    if (d.result === 'defender') assert.ok(d.defender.alive && !d.attacker.alive);
+  }
+  assert.ok(res.attacker > 0, 'a wounded queen should lose to a fresh pawn now and then');
+});
+
 if (failed) { console.log(`\n${failed} test(s) failed`); process.exit(1); }
 console.log('\nall duel tests passed');

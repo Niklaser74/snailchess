@@ -44,9 +44,13 @@ test/                      Node-tester
 - Battle light: duellen ska alltid sluta med att anfallaren vinner — schacket
   har redan avgjort saken, och ett visat skott får aldrig missa
   (`hittingVariant`). Battle: en miss är en miss (`mustWin: false`), turen
-  passas med ett nolldrag. `test/duel.test.mjs` låser båda.
-- Sparat parti är en lista av SAN-drag (`--` = nolldrag), inte PGN — chess.js
-  kan inte läsa in nolldrag från PGN.
+  passas med ett nolldrag. Kaos: båda AI, hp per ruta i `main.js` (`hp`), en
+  fallen pjäs tas bort med `chess.remove` och sedan `new Chess(fen)` — chess.js
+  `history()`/`pgn()` spelar om dragen och skulle annars återuppväcka den.
+  `test/duel.test.mjs` låser alla tre.
+- Sparat parti är händelselistan `events` (SAN, `--` = nolldrag, `x:e4` =
+  pjäs föll), inte PGN — chess.js kan inte läsa in nolldrag från PGN, och
+  borttagna pjäser finns inte i dess historik.
 - Följ befintliga mönster i koden framför generella best practices. Ser något
   udda ut finns det oftast ett skäl — fråga innan du rättar det.
 

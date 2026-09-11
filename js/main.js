@@ -19,6 +19,11 @@ let settings = { ...DEFAULTS, ...store.get('settings', {}) };
 if (settings.mode === 'battle' && settings.v !== 2) settings.mode = 'light'; // "battle" meant battle light before the battle mode existed
 settings.v = 2;
 let kingLost = null; // winner colour when a rescue shot missed in battle mode
+// Kaos: damage follows the piece between duels. hp by square; missing = fresh (KAOS_HP).
+// events: the saved game as a list — SAN, '--' (turn passed) or 'x:<sq>' (piece fell in a duel)
+const KAOS_HP = 60;
+let hp = {};
+let events = [];
 let chess = new Chess();
 let humanSides = new Set(['w', 'b']);
 let busy = false;
@@ -95,6 +100,8 @@ function newGame() {
   humanSides = sidesFor();
   over = false;
   kingLost = null;
+  hp = {};
+  events = [];
   startPlaying();
 }
 function resumeGame() {
@@ -102,9 +109,15 @@ function resumeGame() {
   if (!saved || !saved.moves) return false;
   try {
     const c = new Chess();
-    for (const san of saved.moves) c.move(san === '--' ? null : san); // '--' = a missed capture in battle mode
-    chess = c;
+    for (const e of saved.moves) {
+      if (e === '--') c.move(null); // turn passed (battle: a miss, kaos: the attacker fell)
+      else if (e.startsWith('x:')) c.remove(e.slice(2)); // kaos: a piece fell in a duel
+      else c.move(e);
+    }
+    chess = saved.moves.some((e) => e.startsWith('x:')) ? new Chess(c.fen()) : c; // see piecesFall
   } catch { return false; }
+  events = [...saved.moves];
+  hp = { ...(saved.hp || {}) };
   kingLost = null;
   settings = { ...settings, ...(saved.settings || {}) };
   writeMenu(); applySettings();
@@ -121,6 +134,7 @@ function startPlaying() {
   board.setSelection(null);
   board.setPosition(chess.board());
   board.marks = null;
+  board.hp = settings.mode === 'kaos' ? hp : null;
   $('mate-note').hidden = true;
   const h = chess.history({ verbose: true });
   board.lastMove = h.length ? { from: h[h.length - 1].from, to: h[h.length - 1].to } : null;
@@ -136,7 +150,32 @@ function orientForTurn() {
 }
 function isHumanTurn() { return humanSides.has(chess.turn()); }
 function save() {
-  store.set('game', { moves: chess.history(), settings: { mode: settings.mode, opponent: settings.opponent }, humanSides: [...humanSides], over });
+  store.set('game', { moves: events, hp, settings: { mode: settings.mode, opponent: settings.opponent }, humanSides: [...humanSides], over });
+}
+// Keep the kaos hp map in step with a move that has been played.
+function carryHp(move) {
+  const victimSq = move.flags.includes('e') ? move.to[0] + move.from[1] : (move.captured ? move.to : null);
+  const h = hp[move.from];
+  delete hp[move.from];
+  if (victimSq) delete hp[victimSq];
+  if (h != null) hp[move.to] = h;
+  if (move.flags.includes('k') || move.flags.includes('q')) {
+    const rank = move.from[1], rf = (move.flags.includes('k') ? 'h' : 'a') + rank, rt = (move.flags.includes('k') ? 'f' : 'd') + rank;
+    if (hp[rf] != null) { hp[rt] = hp[rf]; delete hp[rf]; }
+  }
+  board.hp = hp;
+}
+// Pieces fall outside the rules (kaos): remove them, then start a fresh Chess
+// from the position. chess.js's history()/pgn() rebuild the board by replaying
+// the moves, which would resurrect a removed piece, so the history must not
+// reach back past a removal (events keeps the full list for the move panel).
+// Returns false when the removal leaves the king in check (the piece shielded it).
+function piecesFall(squares) {
+  for (const sq of squares) { chess.remove(sq); delete hp[sq]; }
+  if (chess.isCheck()) return false;
+  for (const sq of squares) events.push('x:' + sq);
+  chess = new Chess(chess.fen());
+  return true;
 }
 
 function onSquare(sq) {
@@ -172,7 +211,7 @@ function askPromotion(m) {
 }
 
 async function play(mv) {
-  const moveNo = chess.history().length + 1;
+  const moveNo = events.length + 1;
   const move = chess.move(mv);
   if (!move) return;
   busy = true;
@@ -180,22 +219,25 @@ async function play(mv) {
   board.checkSquare = null;
   $('hud-msg').textContent = '';
   let victimGone = false;
-  if (move.captured && (settings.mode === 'light' || settings.mode === 'battle')) {
+  const lose = (winner) => {
+    kingLost = winner;
+    over = true;
+    busy = false;
+    board.setPosition(chess.board());
+    save(); refreshHud(); renderMoves();
+    showOver();
+  };
+  if (move.captured && settings.mode !== 'gentle') {
     const victimSq = move.flags.includes('e') ? move.to[0] + move.from[1] : move.to;
     const wasInCheck = (() => { chess.undo(); const c = chess.isCheck(); chess.move(mv); return c; })();
-    const result = await duel(move, victimSq, moveNo, settings.mode === 'light');
-    if (result === 'miss') {
+    const kaos = settings.mode === 'kaos' ? { attackerHp: hp[move.from] ?? KAOS_HP, defenderHp: hp[victimSq] ?? KAOS_HP } : null;
+    const outcome = await duel(move, victimSq, moveNo, settings.mode === 'light', kaos);
+    if (outcome.result === 'miss') {
       // battle mode: the piece stays and the turn passes. A missed rescue shot loses the king.
       chess.undo();
-      if (wasInCheck) {
-        kingLost = move.color === 'w' ? 'b' : 'w';
-        over = true;
-        busy = false;
-        board.setPosition(chess.board());
-        save(); refreshHud(); renderMoves();
-        return showOver();
-      }
+      if (wasInCheck) return lose(move.color === 'w' ? 'b' : 'w');
       chess.move(null);
+      events.push('--');
       $('hud-msg').textContent = t('battle.miss');
       board.setPosition(chess.board());
       board.lastMove = { from: move.from, to: move.from };
@@ -203,8 +245,30 @@ async function play(mv) {
       afterMove(true);
       return;
     }
+    if (kaos && outcome.result !== 'attacker') {
+      // kaos: the attacker fell (or both did). It leaves the board; the king cannot.
+      chess.undo();
+      const opponent = move.color === 'w' ? 'b' : 'w';
+      if (wasInCheck || move.piece === 'k') return lose(opponent);
+      const attackerPiece = board.pieceAt(move.from);
+      if (!piecesFall(outcome.result === 'draw' ? [move.from, victimSq] : [move.from])) return lose(opponent);
+      if (outcome.result !== 'draw') hp[victimSq] = outcome.defenderHp;
+      chess.move(null);
+      events.push('--');
+      $('hud-msg').textContent = t(outcome.result === 'draw' ? 'kaos.both' : 'kaos.lost', { piece: t('piece.' + move.piece) });
+      if (attackerPiece) await board.fade(attackerPiece);
+      board.setPosition(chess.board());
+      board.hp = hp;
+      board.lastMove = { from: move.from, to: move.from };
+      busy = false;
+      afterMove(true);
+      return;
+    }
+    if (kaos) hp[move.from] = outcome.attackerHp;
     victimGone = true;
   }
+  if (settings.mode === 'kaos') carryHp(move);
+  events.push(move.san);
   await board.animateMove(move, { victimGone });
   board.setPosition(chess.board()); // reconcile
   board.marks = null;
@@ -222,7 +286,7 @@ function afterMove(keepMessage = false) {
 }
 
 // ---------- the duel (battle light) ----------
-async function duel(move, victimSq, moveNo, mustWin = true) {
+async function duel(move, victimSq, moveNo, mustWin = true, kaos = null) {
   const victimType = move.captured;
   const attacker = { type: move.piece, color: move.color };
   const defender = { type: victimType, color: move.color === 'w' ? 'b' : 'w' };
@@ -230,27 +294,29 @@ async function duel(move, victimSq, moveNo, mustWin = true) {
   $('duel-title').textContent = t('duel.title', { attacker: name(attacker), defender: name(defender) });
   $('duel-msg').textContent = '';
   $('duel').hidden = false;
-  duelCtl = runDuel($('duel-canvas'), { attacker, defender, from: move.from, to: move.to, moveNo, names: { attacker: t('piece.' + attacker.type), defender: t('piece.' + defender.type) } }, { mustWin });
+  duelCtl = runDuel($('duel-canvas'), { attacker, defender, from: move.from, to: move.to, moveNo, names: { attacker: t('piece.' + attacker.type), defender: t('piece.' + defender.type) } }, { mustWin, kaos, speed: kaos ? 1.8 : 1 });
   const msgTimer = setInterval(() => {
     const m = duelCtl?.duel.game.message;
     $('duel-msg').textContent = m && m.key ? t(m.key, m) : '';
   }, 100);
   const result = await duelCtl.promise;
+  const d = duelCtl.duel;
+  const outcome = { result, attackerHp: Math.max(0, d.attacker.hp), defenderHp: Math.max(0, d.defender.hp) };
   clearInterval(msgTimer);
   $('duel').hidden = true;
   duelCtl = null;
-  if (result !== 'miss') {
+  if (result === 'attacker' || result === 'draw') {
     const victim = board.pieceAt(victimSq);
     if (victim) board.pieces = board.pieces.filter((p) => p !== victim);
   }
-  return result;
+  return outcome;
 }
 
 // ---------- undo ----------
 function undo() {
-  if (busy || !$('menu').hidden || chess.history().length === 0) return;
-  chess.undo();
-  if (humanSides.size === 1 && !isHumanTurn() && chess.history().length) chess.undo();
+  if (busy || !$('menu').hidden || chess.history().length === 0 || settings.mode === 'kaos') return; // kaos: no undo, damage is done
+  chess.undo(); events.pop();
+  if (humanSides.size === 1 && !isHumanTurn() && chess.history().length) { chess.undo(); events.pop(); }
   over = false;
   kingLost = null;
   $('over').hidden = true;
@@ -392,14 +458,20 @@ function refreshHud(keepMessage = false) {
   } else if (!busy && !keepMessage) {
     $('hud-msg').textContent = '';
   }
-  $('btn-undo').disabled = chess.history().length === 0;
+  $('btn-undo').disabled = chess.history().length === 0 || settings.mode === 'kaos';
   refreshMute();
 }
 function renderMoves() {
-  const h = chess.history();
+  // one entry per ply from the event list: SAN, a miss, or the squares whose pieces fell before the turn passed
+  const h = [];
+  let fell = [];
+  for (const e of events) {
+    if (e.startsWith('x:')) { fell.push(e.slice(2)); continue; }
+    h.push(e === '--' ? `<i>${fell.length ? '💥' + fell.join('+') : t('moves.miss')}</i>` : e);
+    fell = [];
+  }
   const rows = [];
-  const san = (s) => (s === '--' ? `<i>${t('moves.miss')}</i>` : s);
-  for (let i = 0; i < h.length; i += 2) rows.push(`<li><span class="no">${i / 2 + 1}.</span> <span>${san(h[i])}</span> <span>${h[i + 1] ? san(h[i + 1]) : ''}</span></li>`);
+  for (let i = 0; i < h.length; i += 2) rows.push(`<li><span class="no">${i / 2 + 1}.</span> <span>${h[i]}</span> <span>${h[i + 1] || ''}</span></li>`);
   $('moves-list').innerHTML = rows.join('');
   $('moves-list').scrollTop = $('moves-list').scrollHeight;
 }

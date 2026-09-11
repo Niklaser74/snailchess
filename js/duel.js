@@ -52,8 +52,11 @@ export function duelConfig(spec) {
 // Builds the duel. canvas may be null (headless). Returns { game, attacker, defender, tick, done, result }.
 // mustWin: battle light (the salt finishes a missed shot). false: battle mode, a
 // miss is a miss and the duel ends with result 'miss'.
-export function createDuel(canvas, spec, { mustWin = true } = {}) {
+// kaos: { attackerHp, defenderHp } — both snails shoot in turn until one falls,
+// hp carried over from earlier duels; result attacker | defender | draw.
+export function createDuel(canvas, spec, { mustWin = true, kaos = null } = {}) {
   const config = duelConfig(spec);
+  if (kaos) config.teams[1].ai = 'hard';
   const duel = { game: null, attacker: null, defender: null, done: false, result: null, forced: false };
   duel.game = new Game(canvas, config, {
     onGameOver: (winner) => { duel.done = true; duel.result = winner && winner.index === 0 ? 'attacker' : (winner ? 'defender' : 'draw'); },
@@ -63,11 +66,14 @@ export function createDuel(canvas, spec, { mustWin = true } = {}) {
   duel.defender = g.teams[1].snails[0];
   duel.attacker.name = config.teams[0].name;
   duel.defender.name = config.teams[1].name;
-  duel.defender.hp = DEFENDER_HP;
+  duel.defender.hp = kaos ? kaos.defenderHp : DEFENDER_HP;
+  if (kaos) duel.attacker.hp = kaos.attackerHp;
   g.say({ key: 'msg.turn', name: duel.attacker.name }, 2); // startTurn() already said it with the snail's random name
   // only the piece's own weapons
   const allowed = new Set(DUEL_WEAPONS[spec.attacker.type] || DUEL_WEAPONS.q);
   for (const w of g.weapons) if (!allowed.has(w.id)) g.teams[0].ammo[w.id] = 0;
+  const allowedDef = new Set(DUEL_WEAPONS[spec.defender.type] || DUEL_WEAPONS.q);
+  for (const w of g.weapons) if (!allowedDef.has(w.id)) g.teams[1].ammo[w.id] = 0;
   // face each other
   duel.attacker.facing = 1;
   duel.defender.facing = -1;
@@ -76,6 +82,7 @@ export function createDuel(canvas, spec, { mustWin = true } = {}) {
   duel.tick = () => {
     if (duel.done) return;
     g.tick();
+    if (kaos) { if (g.tickCount > MAX_TICKS * 4 && !duel.done) { duel.done = true; duel.result = 'draw'; } return; }
     const d = duel.defender;
     const settled = g.phase === 'settle' && g.projectiles.length === 0 && g.pendingBooms.length === 0;
     const overdue = g.tickCount > MAX_TICKS || (g.hasFired && settled) || g.turnCount > 1;
@@ -106,8 +113,8 @@ export function hittingVariant(spec, maxTries = 16) {
 // Browser driver: runs the duel on a canvas at real speed and resolves when it
 // is over (plus a moment to look at the empty shell). onSkip() from the UI
 // fast-forwards headlessly.
-export function runDuel(canvas, spec, { holdMs = 2000, mustWin = true } = {}) {
-  const duel = createDuel(canvas, { ...spec, variant: spec.variant ?? (mustWin ? hittingVariant(spec) : 0) }, { mustWin });
+export function runDuel(canvas, spec, { holdMs = 2000, mustWin = true, kaos = null, speed = 1 } = {}) {
+  const duel = createDuel(canvas, { ...spec, variant: spec.variant ?? (mustWin && !kaos ? hittingVariant(spec) : 0) }, { mustWin, kaos });
   const TICK = 1 / 60;
   let raf = 0, last = 0, acc = 0, skipped = false, finished = false;
   const ctl = { duel, promise: null, skip: null };
@@ -129,10 +136,10 @@ export function runDuel(canvas, spec, { holdMs = 2000, mustWin = true } = {}) {
     const frame = (ts) => {
       if (skipped || finished) return;
       if (!last) last = ts;
-      acc += Math.min(0.1, (ts - last) / 1000);
+      acc += Math.min(0.1, (ts - last) / 1000) * speed;
       last = ts;
       let n = 0;
-      while (acc >= TICK && n++ < 6 && !duel.done) { duel.tick(); acc -= TICK; }
+      while (acc >= TICK && n++ < 12 && !duel.done) { duel.tick(); acc -= TICK; }
       duel.game.render();
       if (duel.done) { setTimeout(finish, holdMs); return; }
       raf = requestAnimationFrame(frame);

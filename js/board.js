@@ -26,6 +26,7 @@ export class Board {
     this.lastMove = null; // { from, to }
     this.checkSquare = null;
     this.marks = null; // checkmate explanation: { king, attackers: [sq], blocked: [sq] }
+    this.hp = null; // kaos: hp by square (missing = unhurt); cracks and a small bar
     this.badges = true;
     this.coords = true;
     this.speed = SPEEDS.normal;
@@ -206,8 +207,14 @@ export class Board {
         x: c.x + sq / 2, y: c.y + sq * 0.86, facing: p.facing,
         color: SIDE_COLORS[p.color], scale: (sq / 62) * look.scale, t: t + p.f * 0.7 + p.r * 1.3,
         walking: !!p.walking && !this.reduced, dead: !!p.dying, look: { shell: 'spiral', hat: look.hat },
+        hp: this.hp && this.hp[p.sq] != null ? (this.hp[p.sq] / 60) * 100 : undefined, // cracks appear as the kaos hp drops
       });
       ctx.restore();
+      if (this.hp && this.hp[p.sq] != null && this.hp[p.sq] < 60 && !p.dying) {
+        const w = sq * 0.5, x = c.x + (sq - w) / 2, y = c.y + sq * 0.9;
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x, y, w, 4);
+        ctx.fillStyle = this.hp[p.sq] > 30 ? '#ffd54f' : '#e2453c'; ctx.fillRect(x, y, w * Math.max(0, this.hp[p.sq]) / 60, 4);
+      }
       if (this.badges && !p.dying) {
         const rr = sq * 0.13;
         ctx.fillStyle = 'rgba(255, 250, 240, 0.92)';

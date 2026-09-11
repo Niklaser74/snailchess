@@ -18,8 +18,9 @@ ruta; det tar den tid det tar. Fyra lägen:
   lämnar den brädet och turen går över. Ingen ångra. Mer Snäckmageddon än
   schack.
 
-Spelas mot datorn (tre nivåer), två på samma enhet, offline som installerad
-PWA. Andra spelet i Knackpots snigelserie på [snails.se](https://snails.se),
+Spelas mot datorn (tre nivåer), två på samma enhet, eller via **Snigelpost**
+mot en kompis i egen takt (drag, push-notis, spela när det passar; samma
+konto som Snäckmageddon). Offline som installerad PWA. Andra spelet i Knackpots snigelserie på [snails.se](https://snails.se),
 efter [Snäckmageddon](https://github.com/Niklaser74/snailmageddon).
 Adress: **https://snails.se/snailchess/**.
 
@@ -45,6 +46,8 @@ js/duel.js                   battle light: bygger en Game från js/game/ med due
 js/ai.js, js/ai-worker.js    datormotstånd (negamax med alfa-beta, i en Web Worker)
 js/pieces.js                 pjäs → hatt, storlek, glyf; Gul/Blå = Snäckmageddons lagfärger
 js/i18n.js                   sv/en
+js/supa.js, online.js, push.js  Supabase utan bibliotek (kopia från Snäckmageddon), Snigelpost-API, Web Push
+supabase/                    migrationer och edge-funktionen chess-notify-turn, README
 js/vendor/chess.js           schackreglerna (chess.js 1.4.0, BSD-2)
 js/game/                     kopior från snailmageddon: simulering och renderare (redigera inte här)
 sw.js, manifest.webmanifest  PWA (cache-prefix snailchess-, manifest-id /snailchess/)
@@ -76,7 +79,6 @@ cache-namn börjar med `snailchess-`, `localStorage`-nycklar med
 
 ## Nästa steg
 
-- Snigelpost: drag och dueller över nätet i egen takt, samma Supabase-projekt
-  `snails` som Snäckmageddon.
+- Revansch och serier (bäst av 3) i Snigelpost, som Snäckmageddon.
 - Granaten som duellvapen när AI:ns kastbana är bättre på små arenor.
 - Stockfish WASM för den som vill ha riktigt motstånd.

@@ -6,6 +6,9 @@ import { runDuel } from './duel.js';
 import { t, setLang, detectLang } from './i18n.js';
 import { SIDE_COLORS } from './pieces.js';
 import { setMuted, isMuted, unlockAudio } from './game/audio.js';
+import { snigelpost } from './online.js';
+import { push } from './push.js';
+import { getLang } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -24,6 +27,9 @@ let kingLost = null; // winner colour when a rescue shot missed in battle mode
 const KAOS_HP = 60;
 let hp = {};
 let events = [];
+// Snigelpost: the match being played over the net (null = local game) and where my current ply started in events
+let onlineMatch = null;
+let plyStart = 0;
 let chess = new Chess();
 let humanSides = new Set(['w', 'b']);
 let busy = false;
@@ -65,6 +71,10 @@ function showMenu() {
   $('btn-continue').hidden = !(saved && saved.moves && saved.moves.length && !saved.over);
   $('menu').hidden = false;
   $('hud').hidden = true;
+  $('wait').hidden = true;
+  stopPolling();
+  onlineMatch = null;
+  refreshMatchList();
 }
 $('btn-start').addEventListener('click', () => { readMenu(); newGame(); });
 $('btn-continue').addEventListener('click', () => { readMenu(); if (!resumeGame()) newGame(); });
@@ -96,6 +106,7 @@ function sidesFor() {
   return new Set([side]);
 }
 function newGame() {
+  onlineMatch = null;
   chess = new Chess();
   humanSides = sidesFor();
   over = false;
@@ -104,18 +115,22 @@ function newGame() {
   events = [];
   startPlaying();
 }
+// Rebuild the rules engine from an event list (saved game or online match).
+function chessFrom(list) {
+  const c = new Chess();
+  for (const e of list) {
+    if (e === '--') c.move(null); // turn passed (battle: a miss, kaos: the attacker fell)
+    else if (e.startsWith('x:')) c.remove(e.slice(2)); // kaos: a piece fell in a duel
+    else if (e.startsWith('?:')) continue; // the capture that was attempted before a miss or a fall
+    else c.move(e);
+  }
+  return list.some((e) => e.startsWith('x:')) ? new Chess(c.fen()) : c; // see piecesFall
+}
 function resumeGame() {
   const saved = store.get('game', null);
   if (!saved || !saved.moves) return false;
-  try {
-    const c = new Chess();
-    for (const e of saved.moves) {
-      if (e === '--') c.move(null); // turn passed (battle: a miss, kaos: the attacker fell)
-      else if (e.startsWith('x:')) c.remove(e.slice(2)); // kaos: a piece fell in a duel
-      else c.move(e);
-    }
-    chess = saved.moves.some((e) => e.startsWith('x:')) ? new Chess(c.fen()) : c; // see piecesFall
-  } catch { return false; }
+  try { chess = chessFrom(saved.moves); } catch { return false; }
+  onlineMatch = null;
   events = [...saved.moves];
   hp = { ...(saved.hp || {}) };
   kingLost = null;
@@ -150,6 +165,7 @@ function orientForTurn() {
 }
 function isHumanTurn() { return humanSides.has(chess.turn()); }
 function save() {
+  if (onlineMatch) return; // the server holds online games
   store.set('game', { moves: events, hp, settings: { mode: settings.mode, opponent: settings.opponent }, humanSides: [...humanSides], over });
 }
 // Keep the kaos hp map in step with a move that has been played.
@@ -224,8 +240,7 @@ async function play(mv) {
     over = true;
     busy = false;
     board.setPosition(chess.board());
-    save(); refreshHud(); renderMoves();
-    showOver();
+    afterMove();
   };
   if (move.captured && settings.mode !== 'gentle') {
     const victimSq = move.flags.includes('e') ? move.to[0] + move.from[1] : move.to;
@@ -237,7 +252,7 @@ async function play(mv) {
       chess.undo();
       if (wasInCheck) return lose(move.color === 'w' ? 'b' : 'w');
       chess.move(null);
-      events.push('--');
+      events.push('?:' + move.san, '--');
       $('hud-msg').textContent = t('battle.miss');
       board.setPosition(chess.board());
       board.lastMove = { from: move.from, to: move.from };
@@ -251,7 +266,8 @@ async function play(mv) {
       const opponent = move.color === 'w' ? 'b' : 'w';
       if (wasInCheck || move.piece === 'k') return lose(opponent);
       const attackerPiece = board.pieceAt(move.from);
-      if (!piecesFall(outcome.result === 'draw' ? [move.from, victimSq] : [move.from])) return lose(opponent);
+      events.push('?:' + move.san);
+      if (!piecesFall(outcome.result === 'draw' ? [move.from, victimSq] : [move.from])) { events.pop(); return lose(opponent); }
       if (outcome.result !== 'draw') hp[victimSq] = outcome.defenderHp;
       chess.move(null);
       events.push('--');
@@ -276,12 +292,18 @@ async function play(mv) {
   busy = false;
   afterMove();
 }
-function afterMove(keepMessage = false) {
+async function afterMove(keepMessage = false) {
   orientForTurn();
-  if (chess.isGameOver()) { over = true; save(); refreshHud(); renderMoves(); return finish(); }
+  if (over || chess.isGameOver()) {
+    over = true;
+    save(); refreshHud(); renderMoves();
+    if (onlineMatch) await submitPly();
+    return finish();
+  }
   save();
   refreshHud(keepMessage);
   renderMoves();
+  if (onlineMatch) { await submitPly(); return; }
   maybeComputer();
 }
 
@@ -314,7 +336,7 @@ async function duel(move, victimSq, moveNo, mustWin = true, kaos = null) {
 
 // ---------- undo ----------
 function undo() {
-  if (busy || !$('menu').hidden || chess.history().length === 0 || settings.mode === 'kaos') return; // kaos: no undo, damage is done
+  if (busy || onlineMatch || !$('menu').hidden || chess.history().length === 0 || settings.mode === 'kaos') return; // kaos: no undo, damage is done
   chess.undo(); events.pop();
   if (humanSides.size === 1 && !isHumanTurn() && chess.history().length) { chess.undo(); events.pop(); }
   over = false;
@@ -342,7 +364,7 @@ function askWorker(fen, level) {
   });
 }
 async function maybeComputer() {
-  if (over || isHumanTurn() || busy) return;
+  if (over || onlineMatch || isHumanTurn() || busy) return;
   busy = true;
   $('hud-msg').textContent = t('hud.thinking');
   const fen = chess.fen();
@@ -361,7 +383,7 @@ async function maybeComputer() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function finish() {
   let why = '';
-  if (chess.isCheckmate()) why = await explainMate();
+  if (chess.isCheckmate() && chess.history().length) why = await explainMate();
   showOver(why);
 }
 // Checkmate deserves a moment: replay the mating move slowly, then mark the
@@ -458,17 +480,19 @@ function refreshHud(keepMessage = false) {
   } else if (!busy && !keepMessage) {
     $('hud-msg').textContent = '';
   }
-  $('btn-undo').disabled = chess.history().length === 0 || settings.mode === 'kaos';
+  $('btn-undo').disabled = chess.history().length === 0 || settings.mode === 'kaos' || !!onlineMatch;
   refreshMute();
 }
 function renderMoves() {
   // one entry per ply from the event list: SAN, a miss, or the squares whose pieces fell before the turn passed
   const h = [];
   let fell = [];
+  let tried = '';
   for (const e of events) {
     if (e.startsWith('x:')) { fell.push(e.slice(2)); continue; }
-    h.push(e === '--' ? `<i>${fell.length ? '💥' + fell.join('+') : t('moves.miss')}</i>` : e);
-    fell = [];
+    if (e.startsWith('?:')) { tried = e.slice(2); continue; }
+    h.push(e === '--' ? `<i>${tried ? tried + ' ' : ''}${fell.length ? '💥' + fell.join('+') : t('moves.miss')}</i>` : e);
+    fell = []; tried = '';
   }
   const rows = [];
   for (let i = 0; i < h.length; i += 2) rows.push(`<li><span class="no">${i / 2 + 1}.</span> <span>${h[i]}</span> <span>${h[i + 1] || ''}</span></li>`);
@@ -478,7 +502,10 @@ function renderMoves() {
 function showOver(why = '') {
   let text;
   const loser = chess.turn(), winner = loser === 'w' ? 'b' : 'w';
-  if (kingLost) text = t('over.kingLost', { team: t('team.' + kingLost) });
+  const r = onlineMatch?.result;
+  if (r && r.type === 'resign') text = t(r.winner === onlineMatch.my_color ? 'over.theyResigned' : 'over.youResigned');
+  else if (r && r.type === 'timeout') text = t(r.winner === onlineMatch.my_color ? 'over.timeoutWon' : 'over.timeoutLost');
+  else if (kingLost) text = t('over.kingLost', { team: t('team.' + kingLost) });
   else if (chess.isCheckmate()) text = t('over.mate', { team: t('team.' + winner) });
   else if (chess.isStalemate()) text = t('over.stalemate');
   else if (chess.isThreefoldRepetition()) text = t('over.repetition');
@@ -491,17 +518,227 @@ function showOver(why = '') {
   $('over').hidden = false;
 }
 
+// ---------- Snigelpost (online, one ply at a time) ----------
+let pollTimer = 0;
+function stopPolling() { clearInterval(pollTimer); pollTimer = 0; }
+function playerName() { return (store.get('name', '') || '').trim().slice(0, 24) || t('online.defaultName'); }
+function onlineError(e) {
+  const msg = /anonymous|signup|sign-in|disabled/i.test(e.message) ? t('online.disabled') : t('online.error', { msg: e.message });
+  $('online-status').textContent = msg;
+}
+async function refreshMatchList() {
+  if (!snigelpost.available()) { $('online').hidden = true; return; }
+  $('online').hidden = false;
+  try {
+    const list = await snigelpost.list();
+    $('online-list').innerHTML = list.map((m) => {
+      const mine = snigelpost.isMyTurn(m);
+      const state = m.status === 'finished' ? t('online.finished') : m.status === 'open' ? t('online.open') : mine ? t('online.yourTurn') : t('online.theirTurn', { name: snigelpost.opponentName(m) });
+      const who = snigelpost.opponentName(m) ? t('online.vs', { name: snigelpost.opponentName(m) }) : t('online.noOpponent');
+      return `<li class="mrow${mine ? ' turn' : ''}" data-id="${m.id}"><span class="mwho">${who}<br><small>${t('mode.' + m.mode + '.short')} · ${state}</small></span>` +
+        `<button class="btn secondary mopen">${m.status === 'finished' ? t('online.show') : t('online.play')}</button><button class="icon-btn mdel" aria-label="${t('online.delete')}">✕</button></li>`;
+    }).join('') || `<li class="mnone">${t('online.none')}</li>`;
+    $('online-status').textContent = '';
+  } catch (e) { onlineError(e); }
+}
+$('online-list').addEventListener('click', async (e) => {
+  const row = e.target.closest('li[data-id]');
+  if (!row) return;
+  if (e.target.closest('.mopen')) openMatch(row.dataset.id);
+  else if (e.target.closest('.mdel')) { try { await snigelpost.remove(row.dataset.id); } catch (err) { onlineError(err); } refreshMatchList(); }
+});
+$('opt-name').value = store.get('name', '');
+$('opt-name').addEventListener('change', () => store.set('name', $('opt-name').value.trim().slice(0, 24)));
+$('btn-online-create').addEventListener('click', async () => {
+  readMenu();
+  $('online-status').textContent = t('online.loading');
+  try {
+    const m = await snigelpost.create(playerName(), settings.mode);
+    startOnline(m);
+  } catch (e) { onlineError(e); }
+});
+async function openMatch(id) {
+  $('online-status').textContent = t('online.loading');
+  try {
+    let m = await snigelpost.get(id);
+    if (m.my_color == null) {
+      m = await snigelpost.join(id, playerName());
+      push.notify(id, 'joined');
+    }
+    startOnline(m);
+  } catch (e) { onlineError(e); if ($('menu').hidden) showMenu(); }
+}
+// Set the game up from a match and show whatever is due: the opponent's last
+// ply (with its duel), my move, the waiting room or the result.
+async function startOnline(m) {
+  stopPolling();
+  onlineMatch = m;
+  settings.mode = m.mode;
+  applySettings();
+  humanSides = new Set([m.my_color]);
+  const seen = store.get('seen.' + m.id, 0);
+  const replay = m.ply_count > seen && m.ply_count > 0 && m.turn === m.my_color; // the opponent moved since I last looked
+  const all = m.events;
+  const cut = replay ? plyBoundary(all) : all.length;
+  chess = chessFrom(all.slice(0, cut));
+  events = all.slice(0, cut);
+  hp = { ...(replay ? m.hp_prev : m.hp) };
+  kingLost = null;
+  over = false;
+  $('menu').hidden = true;
+  $('wait').hidden = true;
+  $('hud').hidden = false;
+  $('over').hidden = true;
+  selected = null;
+  board.setSelection(null);
+  board.setPosition(chess.board());
+  board.marks = null;
+  board.hp = m.mode === 'kaos' ? hp : null;
+  board.flipped = m.my_color === 'b';
+  board.lastMove = null;
+  $('mate-note').hidden = true;
+  refreshHud();
+  renderMoves();
+  if (replay) await replayPly(all.slice(cut), cut + 1);
+  store.set('seen.' + m.id, m.ply_count);
+  if (m.status === 'finished') {
+    over = true;
+    if (m.result?.type === 'kingLost') kingLost = m.result.winner;
+    refreshHud();
+    return finish();
+  }
+  if (snigelpost.isMyTurn(m)) { plyStart = events.length; refreshHud(); }
+  else showWaiting();
+}
+// index in events where the last ply starts (a ply ends with SAN or '--'; 'x:'/'?:' entries belong to the ply after them)
+function plyBoundary(list) {
+  let i = list.length - 1;
+  while (i > 0 && (list[i - 1].startsWith('x:') || list[i - 1].startsWith('?:'))) i--;
+  return i;
+}
+// Play the opponent's ply on the board: the duel if it was a capture (same seed,
+// same outcome), then the move, the miss or the fallen pieces.
+async function replayPly(ply, moveNo) {
+  busy = true;
+  const last = ply[ply.length - 1];
+  const tried = ply.find((e) => e.startsWith('?:'))?.slice(2);
+  const san = last === '--' ? tried : last;
+  let mv = null;
+  if (san) { const probe = new Chess(chess.fen()); mv = probe.move(san); }
+  if (mv && mv.captured && settings.mode !== 'gentle') {
+    const victimSq = mv.flags.includes('e') ? mv.to[0] + mv.from[1] : mv.to;
+    const kaos = settings.mode === 'kaos' ? { attackerHp: hp[mv.from] ?? KAOS_HP, defenderHp: hp[victimSq] ?? KAOS_HP } : null;
+    await duel(mv, victimSq, moveNo, settings.mode === 'light', kaos);
+  }
+  // the board still shows the position before the ply (duel() has already taken the victim off it)
+  if (last === '--') {
+    const fallen = ply.filter((e) => e.startsWith('x:')).map((e) => board.pieceAt(e.slice(2))).filter(Boolean);
+    await Promise.all(fallen.map((p) => board.fade(p)));
+    $('hud-msg').textContent = fallen.length ? t('kaos.lost', { piece: mv ? t('piece.' + mv.piece) : '' }) : t('battle.miss');
+    if (mv) board.lastMove = { from: mv.from, to: mv.from };
+  } else if (mv) {
+    await board.animateMove(mv, { victimGone: !!mv.captured && settings.mode !== 'gentle' });
+    board.lastMove = { from: mv.from, to: mv.to };
+  }
+  chess = chessFrom([...events, ...ply]);
+  events.push(...ply);
+  hp = { ...onlineMatch.hp };
+  board.hp = settings.mode === 'kaos' ? hp : null;
+  board.setPosition(chess.board());
+  busy = false;
+  renderMoves();
+  refreshHud(true);
+}
+async function submitPly() {
+  const m = onlineMatch;
+  const mine = events.slice(plyStart);
+  if (!m || !mine.length) return;
+  let result = null;
+  if (over) {
+    const type = kingLost ? 'kingLost' : chess.isCheckmate() ? 'mate' : chess.isStalemate() ? 'stalemate' : 'draw';
+    const winner = kingLost || (type === 'mate' ? (chess.turn() === 'w' ? 'b' : 'w') : null);
+    result = { type, winner };
+  }
+  $('hud-msg').textContent = t('online.sending');
+  try {
+    onlineMatch = await snigelpost.submit(m, mine, chess.fen(), hp, result);
+    store.set('seen.' + m.id, onlineMatch.ply_count);
+    push.notify(m.id, over ? 'finished' : 'turn');
+    if (!over) showWaiting();
+  } catch (e) {
+    $('hud-msg').textContent = t('online.error', { msg: e.message });
+  }
+}
+function showWaiting() {
+  const m = onlineMatch;
+  if (!m) return;
+  $('wait').hidden = false;
+  const open = m.status === 'open';
+  $('wait-title').textContent = open ? t('online.inviteTitle') : t('online.theirTurn', { name: snigelpost.opponentName(m) });
+  $('wait-text').textContent = open ? t('online.inviteText') : t('online.waitText', { name: snigelpost.opponentName(m) });
+  $('wait-link').value = snigelpost.inviteLink(m.id);
+  $('wait-link-row').hidden = !open;
+  $('btn-share').hidden = !navigator.share || !open;
+  $('btn-timeout').hidden = snigelpost.silentDays(m) < 14;
+  refreshPushButton();
+  stopPolling();
+  pollTimer = setInterval(pollMatch, 8000);
+}
+async function pollMatch() {
+  const m = onlineMatch;
+  if (!m || document.hidden) return;
+  try {
+    const fresh = await snigelpost.get(m.id);
+    if (fresh.ply_count !== m.ply_count || fresh.status !== m.status || (!!fresh.guest) !== (!!m.guest)) startOnline(fresh);
+  } catch { /* try again next time */ }
+}
+addEventListener('visibilitychange', () => { if (!document.hidden && onlineMatch && !$('wait').hidden) pollMatch(); });
+$('btn-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('wait-link').value); $('btn-copy').textContent = t('online.copied'); }
+  catch { $('wait-link').select(); }
+  setTimeout(() => { $('btn-copy').textContent = t('online.copy'); }, 1500);
+});
+$('btn-share').addEventListener('click', () => { navigator.share({ title: t('app.name'), url: $('wait-link').value }).catch(() => {}); });
+$('btn-wait-menu').addEventListener('click', showMenu);
+$('btn-resign').addEventListener('click', async () => {
+  if (!onlineMatch || !confirm(t('online.resignConfirm'))) return;
+  try {
+    const m = await snigelpost.resign(onlineMatch.id);
+    if (m) { push.notify(m.id, 'resigned'); startOnline(m); } else showMenu();
+  } catch (e) { onlineError(e); }
+});
+$('btn-timeout').addEventListener('click', async () => {
+  if (!onlineMatch) return;
+  try { const m = await snigelpost.claimTimeout(onlineMatch.id); push.notify(m.id, 'timeout'); startOnline(m); } catch (e) { onlineError(e); }
+});
+function refreshPushButton() {
+  const b = $('btn-push');
+  if (!push.supported()) { b.hidden = true; return; }
+  b.hidden = false;
+  if (push.needsInstall()) { b.textContent = t('push.install'); b.disabled = true; return; }
+  const p = push.permission();
+  b.disabled = p === 'denied';
+  b.textContent = p === 'denied' ? t('push.denied') : p === 'granted' ? t('push.on') : t('push.ask');
+  if (p === 'granted') push.current().then((s) => { if (!s) b.textContent = t('push.ask'); });
+}
+$('btn-push').addEventListener('click', async () => {
+  try { await push.subscribe(getLang()); $('btn-push').textContent = t('push.on'); }
+  catch { $('btn-push').textContent = t('push.denied'); }
+});
+
 // ---------- PWA ----------
 let deferredPrompt = null;
 addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; $('btn-install').hidden = false; });
 $('btn-install').addEventListener('click', async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; $('btn-install').hidden = true; });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then(() => { $('offline-hint').textContent = t('menu.offline'); }).catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(() => { $('offline-hint').textContent = t('menu.offline'); push.resubscribe(getLang()); }).catch(() => {});
   });
 }
 
 // for browser tests and debugging
-window.snailchess = { get chess() { return chess; }, get board() { return board; }, get duel() { return duelCtl; }, get busy() { return busy; } };
+window.snailchess = { get chess() { return chess; }, get board() { return board; }, get duel() { return duelCtl; }, get busy() { return busy; }, get match() { return onlineMatch; }, get events() { return events; } };
 
 showMenu();
+const joinId = new URLSearchParams(location.search).get('match');
+if (joinId) { history.replaceState(null, '', location.pathname); openMatch(joinId); }

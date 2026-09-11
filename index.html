@@ -96,6 +96,16 @@
       <button id="btn-install" class="btn secondary" hidden data-i18n="menu.install">Installera app</button>
     </div>
     <p id="offline-hint" class="hint"></p>
+    <section id="online" hidden>
+      <h2 data-i18n="online.title">Snigelpost</h2>
+      <p class="blurb" data-i18n="online.blurb">Spela mot en kompis i egen takt, i det spelläge som är valt ovan. Skapa ett parti, skicka länken, dra när du hinner.</p>
+      <div class="online-row">
+        <label><span data-i18n="online.name">Ditt namn</span><input id="opt-name" maxlength="24" autocomplete="nickname"></label>
+        <button id="btn-online-create" class="btn secondary" data-i18n="online.create">Skapa parti</button>
+      </div>
+      <ul id="online-list"></ul>
+      <p id="online-status" class="hint"></p>
+    </section>
     <footer>
       <span data-i18n="app.by">En <a href="https://knackpot.se" target="_blank" rel="noopener">Knackpot</a>-produkt</span>
       · <a href="https://snails.se/" data-i18n="app.hub">Fler snigelspel på snails.se</a>
@@ -137,6 +147,25 @@
     <div class="duel-bar">
       <span id="duel-msg"></span>
       <button id="btn-duel-skip" class="btn secondary" data-i18n="duel.skip">Hoppa över</button>
+    </div>
+  </div>
+</div>
+
+<!-- Waiting room (Snigelpost) -->
+<div id="wait" class="overlay" hidden>
+  <div class="panel small">
+    <h2 id="wait-title"></h2>
+    <p id="wait-text"></p>
+    <div id="wait-link-row" class="link-row">
+      <input id="wait-link" readonly>
+      <button id="btn-copy" class="btn secondary" data-i18n="online.copy">Kopiera länk</button>
+      <button id="btn-share" class="btn secondary" hidden data-i18n="online.share">Dela</button>
+    </div>
+    <div class="actions">
+      <button id="btn-push" class="btn secondary" hidden></button>
+      <button id="btn-timeout" class="btn secondary" hidden data-i18n="online.claim">Kräv vinst</button>
+      <button id="btn-resign" class="btn secondary" data-i18n="online.resign">Ge upp</button>
+      <button id="btn-wait-menu" class="btn primary" data-i18n="over.menu">Till menyn</button>
     </div>
   </div>
 </div>

@@ -1,6 +1,6 @@
 // Service worker: cache-first app shell so the game works offline.
 // Cache names are prefixed per game: everything on snails.se shares one origin.
-const VERSION = 'snailchess-v5';
+const VERSION = 'snailchess-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,10 @@ const ASSETS = [
   './js/ai-worker.js',
   './js/pieces.js',
   './js/i18n.js',
+  './js/config.js',
+  './js/supa.js',
+  './js/online.js',
+  './js/push.js',
   './js/vendor/chess.js',
   './js/game/game.js',
   './js/game/terrain.js',
@@ -36,6 +40,31 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('snailchess-') && k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
+});
+
+// ---------- Web Push (Snigelpost: "your turn") ----------
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Snäckschack', {
+    body: d.body || '',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    tag: d.tag || 'snailchess',
+    renotify: true,
+    data: { url: d.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) {
+      if ('focus' in c) { if ('navigate' in c) c.navigate(url); return c.focus(); }
+    }
+    return clients.openWindow(url);
+  }));
 });
 
 self.addEventListener('fetch', (e) => {

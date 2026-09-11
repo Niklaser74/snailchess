@@ -26,6 +26,9 @@ js/board.js                brädet — ritar med js/game/snails.js, vet inget om
 js/duel.js                 battle light — kör Snäckmageddons Game med duell-config
 js/ai.js                   datorn — negamax på chess.js internals (se kommentaren i filen)
 js/vendor/chess.js         reglerna, pinnad 1.4.0
+js/supa.js                 KOPIA från snailmageddon (delar sessionsnyckel med det, medvetet)
+js/online.js, js/push.js   Snigelpost: RPC:er snailchess_*, push via chess-notify-turn
+supabase/                  migrationer + edge-funktion; applicera med MCP, aldrig db push från snailmageddon
 js/game/                   KOPIOR från snailmageddon — ändra där, kör sync:game
 test/                      Node-tester
 ```
@@ -48,6 +51,9 @@ test/                      Node-tester
   fallen pjäs tas bort med `chess.remove` och sedan `new Chess(fen)` — chess.js
   `history()`/`pgn()` spelar om dragen och skulle annars återuppväcka den.
   `test/duel.test.mjs` låser alla tre.
+- Snigelpost skickar en ply i taget som händelser (`?:` försök, `x:` föll, `--`
+  turen över); servern kontrollerar tur och form, klienterna reglerna. Se
+  `supabase/README.md`.
 - Sparat parti är händelselistan `events` (SAN, `--` = nolldrag, `x:e4` =
   pjäs föll), inte PGN — chess.js kan inte läsa in nolldrag från PGN, och
   borttagna pjäser finns inte i dess historik.

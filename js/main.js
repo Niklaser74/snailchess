@@ -307,13 +307,42 @@ async function explainMate() {
   board.checkSquare = king;
   board.marks = { king, attackers, blocked };
   $('hud-msg').textContent = t('mate.banner');
-  $('mate-note').textContent = why + ' ' + t('mate.tap');
-  $('mate-note').hidden = false;
-  await new Promise((resolve) => {
-    const done = () => { clearTimeout(timer); removeEventListener('pointerdown', done); resolve(); };
+  // the note with a skip button; skipping ends the whole explanation
+  let skipped = false;
+  const skip = () => { skipped = true; };
+  $('btn-mate-skip').addEventListener('click', skip);
+  const note = (text) => { $('mate-text').textContent = text; $('mate-note').hidden = false; };
+  const pause = async (ms) => { const end = performance.now() + ms; while (!skipped && performance.now() < end) await sleep(100); };
+  note(why);
+  await pause(2500);
+  // what would happen if the king went each way: it crawls there, the piece that would take it lights up, it crawls back
+  const kingPiece = board.pieceAt(king);
+  const describe = (sqs) => sqs.map((s) => t('mate.attacker', { piece: t('piece.' + chess.get(s).type + '.def'), sq: s })).join(t('mate.and'));
+  for (const s of blocked) {
+    if (skipped || !kingPiece) break;
+    // attackers of the square as if the king had left its own square (a rook's line runs on behind it)
+    chess.remove(king);
+    const att = chess.attackers(s, winner);
+    chess.put({ type: 'k', color: loser }, king);
+    board.marks = { king: s, attackers: att, blocked: [] };
+    note(t('mate.ifKing', { sq: s, attackers: describe(att) }));
+    await board.crawl(kingPiece, s);
+    await pause(1400);
+    if (skipped) break;
+    board.marks = { king, attackers, blocked };
+    await board.crawl(kingPiece, king);
+    await pause(250);
+  }
+  if (kingPiece && kingPiece.sq !== king) { board.setPosition(chess.board()); }
+  board.marks = { king, attackers, blocked };
+  note(t('mate.ifKingStay', { attackers: describe(attackers) }) + ' ' + t('mate.tap'));
+  if (!skipped) await new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); removeEventListener('pointerdown', done); $('btn-mate-skip').removeEventListener('click', done); resolve(); };
     const timer = setTimeout(done, 12000);
+    $('btn-mate-skip').addEventListener('click', done);
     setTimeout(() => addEventListener('pointerdown', done), 300);
   });
+  $('btn-mate-skip').removeEventListener('click', skip);
   $('mate-note').hidden = true;
   busy = false;
   return why;

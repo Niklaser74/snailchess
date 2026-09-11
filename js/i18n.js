@@ -40,7 +40,8 @@ const dict = {
     'aria.mute': 'Ljud av', 'aria.unmute': 'Ljud på',
     'mate.banner': 'Schackmatt!', 'mate.replay': 'Repris av draget…', 'mate.tap': 'Tryck för att gå vidare',
     'mate.why': '{team} kung på {sq} står i schack från {attackers}. Kungen har ingen ruta att fly till (röda kryss), ingen pjäs kan slå angriparen och ingen kan ställa sig emellan.',
-    'mate.attacker': '{piece} på {sq}', 'mate.and': ' och ',
+    'mate.attacker': '{piece} på {sq}', 'mate.and': ' och ', 'mate.skip': 'Hoppa över',
+    'mate.ifKing': 'Går kungen till {sq} slår {attackers} den.', 'mate.ifKingStay': 'Kungen kan inte stå kvar heller: {attackers} hotar den.',
     'piece.k.def': 'kungen', 'piece.q.def': 'damen', 'piece.r.def': 'tornet', 'piece.b.def': 'löparen', 'piece.n.def': 'springaren', 'piece.p.def': 'bonden',
   },
   en: {
@@ -81,7 +82,8 @@ const dict = {
     'aria.mute': 'Sound off', 'aria.unmute': 'Sound on',
     'mate.banner': 'Checkmate!', 'mate.replay': 'Replay of the move…', 'mate.tap': 'Tap to continue',
     'mate.why': 'The {team} king on {sq} is in check from {attackers}. The king has no square to run to (red crosses), no piece can capture the attacker and nothing can block.',
-    'mate.attacker': '{piece} on {sq}', 'mate.and': ' and ',
+    'mate.attacker': '{piece} on {sq}', 'mate.and': ' and ', 'mate.skip': 'Skip',
+    'mate.ifKing': 'If the king goes to {sq}, {attackers} takes it.', 'mate.ifKingStay': 'The king cannot stay either: {attackers} is attacking it.',
     'piece.k.def': 'the king', 'piece.q.def': 'the queen', 'piece.r.def': 'the rook', 'piece.b.def': 'the bishop', 'piece.n.def': 'the knight', 'piece.p.def': 'the pawn',
   },
 };

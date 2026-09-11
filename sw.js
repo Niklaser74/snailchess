@@ -1,6 +1,6 @@
 // Service worker: cache-first app shell so the game works offline.
 // Cache names are prefixed per game: everything on snails.se shares one origin.
-const VERSION = 'snailchess-v2';
+const VERSION = 'snailchess-v3';
 const ASSETS = [
   './',
   './index.html',

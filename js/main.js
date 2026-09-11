@@ -16,6 +16,9 @@ const store = {
 
 const DEFAULTS = { mode: 'gentle', opponent: 'normal', side: 'w', speed: 'normal', hints: true, badges: true, flip: false };
 let settings = { ...DEFAULTS, ...store.get('settings', {}) };
+if (settings.mode === 'battle' && settings.v !== 2) settings.mode = 'light'; // "battle" meant battle light before the battle mode existed
+settings.v = 2;
+let kingLost = null; // winner colour when a rescue shot missed in battle mode
 let chess = new Chess();
 let humanSides = new Set(['w', 'b']);
 let busy = false;
@@ -54,7 +57,7 @@ applySettings();
 
 function showMenu() {
   const saved = store.get('game', null);
-  $('btn-continue').hidden = !(saved && saved.pgn && !saved.over);
+  $('btn-continue').hidden = !(saved && saved.moves && saved.moves.length && !saved.over);
   $('menu').hidden = false;
   $('hud').hidden = true;
 }
@@ -91,16 +94,18 @@ function newGame() {
   chess = new Chess();
   humanSides = sidesFor();
   over = false;
+  kingLost = null;
   startPlaying();
 }
 function resumeGame() {
   const saved = store.get('game', null);
-  if (!saved || !saved.pgn) return false;
+  if (!saved || !saved.moves) return false;
   try {
     const c = new Chess();
-    c.loadPgn(saved.pgn);
+    for (const san of saved.moves) c.move(san === '--' ? null : san); // '--' = a missed capture in battle mode
     chess = c;
   } catch { return false; }
+  kingLost = null;
   settings = { ...settings, ...(saved.settings || {}) };
   writeMenu(); applySettings();
   humanSides = new Set(saved.humanSides || ['w', 'b']);
@@ -131,7 +136,7 @@ function orientForTurn() {
 }
 function isHumanTurn() { return humanSides.has(chess.turn()); }
 function save() {
-  store.set('game', { pgn: chess.pgn(), settings: { mode: settings.mode, opponent: settings.opponent }, humanSides: [...humanSides], over });
+  store.set('game', { moves: chess.history(), settings: { mode: settings.mode, opponent: settings.opponent }, humanSides: [...humanSides], over });
 }
 
 function onSquare(sq) {
@@ -175,9 +180,29 @@ async function play(mv) {
   board.checkSquare = null;
   $('hud-msg').textContent = '';
   let victimGone = false;
-  if (move.captured && settings.mode === 'battle') {
+  if (move.captured && (settings.mode === 'light' || settings.mode === 'battle')) {
     const victimSq = move.flags.includes('e') ? move.to[0] + move.from[1] : move.to;
-    await duel(move, victimSq, moveNo);
+    const wasInCheck = (() => { chess.undo(); const c = chess.isCheck(); chess.move(mv); return c; })();
+    const result = await duel(move, victimSq, moveNo, settings.mode === 'light');
+    if (result === 'miss') {
+      // battle mode: the piece stays and the turn passes. A missed rescue shot loses the king.
+      chess.undo();
+      if (wasInCheck) {
+        kingLost = move.color === 'w' ? 'b' : 'w';
+        over = true;
+        busy = false;
+        board.setPosition(chess.board());
+        save(); refreshHud(); renderMoves();
+        return showOver();
+      }
+      chess.move(null);
+      $('hud-msg').textContent = t('battle.miss');
+      board.setPosition(chess.board());
+      board.lastMove = { from: move.from, to: move.from };
+      busy = false;
+      afterMove(true);
+      return;
+    }
     victimGone = true;
   }
   await board.animateMove(move, { victimGone });
@@ -187,17 +212,17 @@ async function play(mv) {
   busy = false;
   afterMove();
 }
-function afterMove() {
+function afterMove(keepMessage = false) {
   orientForTurn();
   if (chess.isGameOver()) { over = true; save(); refreshHud(); renderMoves(); return finish(); }
   save();
-  refreshHud();
+  refreshHud(keepMessage);
   renderMoves();
   maybeComputer();
 }
 
 // ---------- the duel (battle light) ----------
-async function duel(move, victimSq, moveNo) {
+async function duel(move, victimSq, moveNo, mustWin = true) {
   const victimType = move.captured;
   const attacker = { type: move.piece, color: move.color };
   const defender = { type: victimType, color: move.color === 'w' ? 'b' : 'w' };
@@ -205,17 +230,20 @@ async function duel(move, victimSq, moveNo) {
   $('duel-title').textContent = t('duel.title', { attacker: name(attacker), defender: name(defender) });
   $('duel-msg').textContent = '';
   $('duel').hidden = false;
-  duelCtl = runDuel($('duel-canvas'), { attacker, defender, from: move.from, to: move.to, moveNo, names: { attacker: t('piece.' + attacker.type), defender: t('piece.' + defender.type) } });
+  duelCtl = runDuel($('duel-canvas'), { attacker, defender, from: move.from, to: move.to, moveNo, names: { attacker: t('piece.' + attacker.type), defender: t('piece.' + defender.type) } }, { mustWin });
   const msgTimer = setInterval(() => {
     const m = duelCtl?.duel.game.message;
     $('duel-msg').textContent = m && m.key ? t(m.key, m) : '';
   }, 100);
-  await duelCtl.promise;
+  const result = await duelCtl.promise;
   clearInterval(msgTimer);
   $('duel').hidden = true;
   duelCtl = null;
-  const victim = board.pieceAt(victimSq);
-  if (victim) board.pieces = board.pieces.filter((p) => p !== victim);
+  if (result !== 'miss') {
+    const victim = board.pieceAt(victimSq);
+    if (victim) board.pieces = board.pieces.filter((p) => p !== victim);
+  }
+  return result;
 }
 
 // ---------- undo ----------
@@ -224,6 +252,7 @@ function undo() {
   chess.undo();
   if (humanSides.size === 1 && !isHumanTurn() && chess.history().length) chess.undo();
   over = false;
+  kingLost = null;
   $('over').hidden = true;
   deselect();
   board.setPosition(chess.board());
@@ -349,7 +378,7 @@ async function explainMate() {
 }
 
 // ---------- HUD ----------
-function refreshHud() {
+function refreshHud(keepMessage = false) {
   const turn = chess.turn();
   const chip = $('hud-turn');
   chip.textContent = t('hud.turn', { team: t('team.' + turn) }) + (humanSides.has(turn) ? '' : ' ' + t('hud.ai'));
@@ -360,7 +389,7 @@ function refreshHud() {
     $('hud-msg').textContent = isHumanTurn() ? t('msg.inCheck') : t('hud.check');
     const rows = chess.board();
     for (const row of rows) for (const p of row) if (p && p.type === 'k' && p.color === turn) board.checkSquare = p.square;
-  } else if (!busy) {
+  } else if (!busy && !keepMessage) {
     $('hud-msg').textContent = '';
   }
   $('btn-undo').disabled = chess.history().length === 0;
@@ -369,14 +398,16 @@ function refreshHud() {
 function renderMoves() {
   const h = chess.history();
   const rows = [];
-  for (let i = 0; i < h.length; i += 2) rows.push(`<li><span class="no">${i / 2 + 1}.</span> <span>${h[i]}</span> <span>${h[i + 1] || ''}</span></li>`);
+  const san = (s) => (s === '--' ? `<i>${t('moves.miss')}</i>` : s);
+  for (let i = 0; i < h.length; i += 2) rows.push(`<li><span class="no">${i / 2 + 1}.</span> <span>${san(h[i])}</span> <span>${h[i + 1] ? san(h[i + 1]) : ''}</span></li>`);
   $('moves-list').innerHTML = rows.join('');
   $('moves-list').scrollTop = $('moves-list').scrollHeight;
 }
 function showOver(why = '') {
   let text;
   const loser = chess.turn(), winner = loser === 'w' ? 'b' : 'w';
-  if (chess.isCheckmate()) text = t('over.mate', { team: t('team.' + winner) });
+  if (kingLost) text = t('over.kingLost', { team: t('team.' + kingLost) });
+  else if (chess.isCheckmate()) text = t('over.mate', { team: t('team.' + winner) });
   else if (chess.isStalemate()) text = t('over.stalemate');
   else if (chess.isThreefoldRepetition()) text = t('over.repetition');
   else if (chess.isInsufficientMaterial()) text = t('over.material');

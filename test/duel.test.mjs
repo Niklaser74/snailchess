@@ -75,5 +75,20 @@ test('a shown duel never needs the salt: the hitting variant really hits, for ev
   assert.equal(salted, 0, ` of  shown duels would have needed the salt`);
 });
 
+test('battle mode (mustWin false): a miss is a miss, no salt, and hits are still the majority', () => {
+  let miss = 0, hit = 0;
+  for (let m = 1; m <= 40; m++) for (const a of 'rp') {
+    const d = createDuel(null, { attacker: { type: a, color: 'w' }, defender: { type: 'n', color: 'b' }, from: 'd4', to: 'abcdefgh'[m % 8] + (1 + (m * 5) % 8), moveNo: m }, { mustWin: false });
+    let n = 0;
+    while (!d.done && n++ < 60 * 60) d.tick();
+    assert.ok(d.done, 'battle duel must end');
+    assert.equal(d.forced, false, 'no salt in battle mode');
+    if (d.result === 'miss') { miss++; assert.ok(d.defender.alive, 'a miss leaves the defender alive'); }
+    else { hit++; assert.equal(d.result, 'attacker'); }
+  }
+  assert.ok(miss > 0, 'some shots should miss');
+  assert.ok(hit > miss * 2, `hits  should clearly outnumber misses `);
+});
+
 if (failed) { console.log(`\n${failed} test(s) failed`); process.exit(1); }
 console.log('\nall duel tests passed');

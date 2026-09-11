@@ -50,7 +50,9 @@ export function duelConfig(spec) {
 }
 
 // Builds the duel. canvas may be null (headless). Returns { game, attacker, defender, tick, done, result }.
-export function createDuel(canvas, spec) {
+// mustWin: battle light (the salt finishes a missed shot). false: battle mode, a
+// miss is a miss and the duel ends with result 'miss'.
+export function createDuel(canvas, spec, { mustWin = true } = {}) {
   const config = duelConfig(spec);
   const duel = { game: null, attacker: null, defender: null, done: false, result: null, forced: false };
   duel.game = new Game(canvas, config, {
@@ -77,7 +79,11 @@ export function createDuel(canvas, spec) {
     const d = duel.defender;
     const settled = g.phase === 'settle' && g.projectiles.length === 0 && g.pendingBooms.length === 0;
     const overdue = g.tickCount > MAX_TICKS || (g.hasFired && settled) || g.turnCount > 1;
-    if (overdue && d.alive && d.hp > 0) { duel.forced = true; g.say({ key: 'duel.salt', name: d.name }, 2); g.damage(d, 999, 'salt'); }
+    if (overdue && d.alive && d.hp > 0) {
+      if (mustWin) { duel.forced = true; g.say({ key: 'duel.salt', name: d.name }, 2); g.damage(d, 999, 'salt'); }
+      else { duel.done = true; duel.result = 'miss'; g.say({ key: 'duel.miss', name: duel.attacker.name }, 3); g.paused = true; }
+    }
+    if (!mustWin && !duel.done && !duel.attacker.alive) { duel.done = true; duel.result = 'miss'; g.say({ key: 'duel.miss', name: duel.attacker.name }, 3); g.paused = true; }
     if (g.tickCount > MAX_TICKS + 120 && !duel.done) { duel.done = true; duel.result = 'attacker'; }
   };
   return duel;
@@ -100,8 +106,8 @@ export function hittingVariant(spec, maxTries = 16) {
 // Browser driver: runs the duel on a canvas at real speed and resolves when it
 // is over (plus a moment to look at the empty shell). onSkip() from the UI
 // fast-forwards headlessly.
-export function runDuel(canvas, spec, { holdMs = 2000 } = {}) {
-  const duel = createDuel(canvas, { ...spec, variant: spec.variant ?? hittingVariant(spec) });
+export function runDuel(canvas, spec, { holdMs = 2000, mustWin = true } = {}) {
+  const duel = createDuel(canvas, { ...spec, variant: spec.variant ?? (mustWin ? hittingVariant(spec) : 0) }, { mustWin });
   const TICK = 1 / 60;
   let raf = 0, last = 0, acc = 0, skipped = false, finished = false;
   const ctl = { duel, promise: null, skip: null };

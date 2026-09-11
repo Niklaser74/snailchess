@@ -41,8 +41,12 @@ test/                      Node-tester
 - Nya JS-filer måste in i `sw.js` (testet säger till).
 - Sidorna heter Gul (drar först, chess.js `w`) och Blå (`b`). Färgerna är
   Snäckmageddons lagfärger, hämtade från `js/game/snails.js`.
-- Duellen ska alltid sluta med att anfallaren vinner — schacket har redan
-  avgjort saken. `test/duel.test.mjs` låser det.
+- Battle light: duellen ska alltid sluta med att anfallaren vinner — schacket
+  har redan avgjort saken, och ett visat skott får aldrig missa
+  (`hittingVariant`). Battle: en miss är en miss (`mustWin: false`), turen
+  passas med ett nolldrag. `test/duel.test.mjs` låser båda.
+- Sparat parti är en lista av SAN-drag (`--` = nolldrag), inte PGN — chess.js
+  kan inte läsa in nolldrag från PGN.
 - Följ befintliga mönster i koden framför generella best practices. Ser något
   udda ut finns det oftast ett skäl — fråga innan du rättar det.
 

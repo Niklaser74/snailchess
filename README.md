@@ -1,14 +1,18 @@
 # Snäckschack / Snail Chess
 
 Schack med sniglar. Pjäserna är Snäckmageddons sniglar och kryper till sin
-ruta; det tar den tid det tar. Två lägen:
+ruta; det tar den tid det tar. Tre lägen:
 
 - **Snällt schack** – vanliga regler, ingen skjuter. Den slagna snigeln drar
   sig in i skalet och lämnar brädet. Lagliga drag visas, schack varnas, ångra
   finns. Tänkt för barn, nybörjare, skolor och klubbar.
 - **Battle light** – varje slag spelas upp som en kort Snäckmageddon-duell
   där anfallaren skjuter på försvararen. Schackreglerna har redan avgjort
-  utgången, så anfallaren vinner alltid; missar skottet tar saltet honom.
+  utgången, så anfallaren vinner alltid: duellen är deterministisk per drag,
+  och varianter provas headless tills skottet faktiskt träffar.
+- **Battle** – anfallaren måste träffa. Miss = pjäsen står kvar och turen
+  går över (ett nolldrag, `--` i draglistan). Missar räddningsskottet när man
+  står i schack faller kungen. Inte längre riktigt schack.
 
 Spelas mot datorn (tre nivåer), två på samma enhet, offline som installerad
 PWA. Andra spelet i Knackpots snigelserie på [snails.se](https://snails.se),
@@ -68,7 +72,7 @@ cache-namn börjar med `snailchess-`, `localStorage`-nycklar med
 
 ## Nästa steg
 
-- Battle (anfallaren måste träffa) och Kaos (båda skjuter) som lägen.
+- Kaos (båda skjuter växelvis, skada kvarstår mellan dueller) som läge.
 - Snigelpost: drag och dueller över nätet i egen takt, samma Supabase-projekt
   `snails` som Snäckmageddon.
 - Granaten som duellvapen när AI:ns kastbana är bättre på små arenor.

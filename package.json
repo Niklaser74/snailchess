@@ -1,0 +1,14 @@
+{
+  "name": "snailchess",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Snäckschack – schack med sniglar som kryper till sin ruta, och slag som avgörs i en Snäckmageddon-duell. PWA utan byggsteg.",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node test/paths.test.mjs && node test/rules.test.mjs && node test/duel.test.mjs && node test/sw.test.mjs",
+    "sync:game": "node scripts/sync-game.mjs",
+    "icons": "node scripts/icons.mjs"
+  },
+  "license": "UNLICENSED"
+}

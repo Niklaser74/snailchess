@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#5fb0ea">
+<meta name="description" content="Snäckschack – schack med sniglar som kryper till sin ruta. Snällt schack för nybörjare, eller battle light där slaget avgörs i en Snäckmageddon-duell. Snail Chess: chess with snails.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Snail Chess">
+<title>Snäckschack</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="snails.se">
+<meta property="og:title" content="Snail Chess – chess with snails">
+<meta property="og:description" content="Pjäserna kryper till sin ruta. Det tar den tid det tar. / The pieces crawl to their square. It takes as long as it takes.">
+<meta property="og:image" content="https://snails.se/snailchess/icons/icon-512.png">
+<meta property="og:url" content="https://snails.se/snailchess/">
+<link rel="canonical" href="https://snails.se/snailchess/">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="board" aria-label="Schackbräde"></canvas>
+  <aside id="moves" aria-live="polite">
+    <h2 data-i18n="moves.title">Drag</h2>
+    <ol id="moves-list"></ol>
+  </aside>
+</div>
+
+<!-- HUD -->
+<div id="hud" hidden>
+  <div class="hud-top">
+    <span id="hud-turn" class="team-chip"></span>
+    <span id="hud-msg" class="message"></span>
+    <div class="hud-btns">
+      <button id="btn-undo" class="icon-btn" data-i18n-aria="aria.undo" aria-label="Ångra">↶</button>
+      <button id="btn-flip" class="icon-btn" data-i18n-aria="aria.flip" aria-label="Vänd brädet">⇅</button>
+      <button id="btn-mute" class="icon-btn" aria-label="Ljud av">🔊</button>
+      <button id="btn-menu" class="icon-btn" data-i18n-aria="aria.menu" aria-label="Meny">☰</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <div class="lang" role="group" aria-label="Språk">
+      <button data-lang="sv" aria-pressed="true">SV</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+    </div>
+    <h1 data-i18n="app.name">Snäckschack</h1>
+    <p class="tagline" data-i18n="app.tagline">Schack med sniglar. Pjäserna kryper till sin ruta. Det tar den tid det tar.</p>
+    <div class="opts">
+      <label><span data-i18n="menu.mode">Spelläge</span>
+        <select id="opt-mode">
+          <option value="gentle" data-i18n="mode.gentle">Snällt schack – ingen skjuter</option>
+          <option value="battle" data-i18n="mode.battle">Battle light – slag avgörs i en duell</option>
+        </select></label>
+      <label><span data-i18n="menu.opponent">Motståndare</span>
+        <select id="opt-opponent">
+          <option value="human" data-i18n="opp.human">Två spelare, samma enhet</option>
+          <option value="easy" data-i18n="opp.easy">Dator – lätt</option>
+          <option value="normal" data-i18n="opp.normal">Dator – normal</option>
+          <option value="hard" data-i18n="opp.hard">Dator – svår</option>
+        </select></label>
+      <label><span data-i18n="menu.side">Du spelar</span>
+        <select id="opt-side">
+          <option value="w" data-i18n="side.w">Gul (drar först)</option>
+          <option value="b" data-i18n="side.b">Blå</option>
+          <option value="random" data-i18n="side.random">Slumpa</option>
+        </select></label>
+      <label><span data-i18n="menu.speed">Snigelfart</span>
+        <select id="opt-speed">
+          <option value="fast" data-i18n="speed.fast">Rask, för att vara snigel</option>
+          <option value="normal" data-i18n="speed.normal">Lagom</option>
+          <option value="snail" data-i18n="speed.snail">Riktig snigel</option>
+        </select></label>
+      <label class="check"><input type="checkbox" id="opt-hints"> <span data-i18n="menu.hints">Visa lagliga drag</span></label>
+      <label class="check"><input type="checkbox" id="opt-badges"> <span data-i18n="menu.badges">Pjäsmärken i rutorna</span></label>
+      <label class="check"><input type="checkbox" id="opt-flip"> <span data-i18n="menu.flip">Vänd brädet mot den som ska dra</span></label>
+    </div>
+    <div class="actions">
+      <button id="btn-continue" class="btn secondary" hidden data-i18n="menu.continue">Fortsätt partiet</button>
+      <button id="btn-start" class="btn primary" data-i18n="menu.start">Nytt parti</button>
+      <button id="btn-help" class="btn secondary" data-i18n="menu.help">Så spelar du</button>
+      <button id="btn-install" class="btn secondary" hidden data-i18n="menu.install">Installera app</button>
+    </div>
+    <p id="offline-hint" class="hint"></p>
+    <footer>
+      <span data-i18n="app.by">En <a href="https://knackpot.se" target="_blank" rel="noopener">Knackpot</a>-produkt</span>
+      · <a href="https://snails.se/" data-i18n="app.hub">Fler snigelspel på snails.se</a>
+    </footer>
+  </div>
+</div>
+
+<!-- Help -->
+<div id="help" class="overlay" hidden>
+  <div class="panel">
+    <h2 data-i18n="help.title">Så spelar du</h2>
+    <p data-i18n="help.1"></p>
+    <p data-i18n="help.2"></p>
+    <p data-i18n="help.3"></p>
+    <p data-i18n="help.4"></p>
+    <p data-i18n="help.5"></p>
+    <div class="actions"><button id="btn-help-close" class="btn primary" data-i18n="help.close">Stäng</button></div>
+  </div>
+</div>
+
+<!-- Promotion -->
+<div id="promo" class="overlay" hidden>
+  <div class="panel small">
+    <h2 data-i18n="promo.title">Bonden kom ända fram! Vad blir den?</h2>
+    <div class="promo-row">
+      <button class="btn secondary" data-piece="q"><span class="glyph">♛</span><span data-i18n="piece.q">Dam</span></button>
+      <button class="btn secondary" data-piece="r"><span class="glyph">♜</span><span data-i18n="piece.r">Torn</span></button>
+      <button class="btn secondary" data-piece="b"><span class="glyph">♝</span><span data-i18n="piece.b">Löpare</span></button>
+      <button class="btn secondary" data-piece="n"><span class="glyph">♞</span><span data-i18n="piece.n">Springare</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Duel (battle light) -->
+<div id="duel" class="overlay dark" hidden>
+  <div class="duel-box">
+    <h2 id="duel-title"></h2>
+    <canvas id="duel-canvas"></canvas>
+    <div class="duel-bar">
+      <span id="duel-msg"></span>
+      <button id="btn-duel-skip" class="btn secondary" data-i18n="duel.skip">Hoppa över</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game over -->
+<div id="over" class="overlay" hidden>
+  <div class="panel small">
+    <h2 data-i18n="over.title">Partiet är slut</h2>
+    <p id="over-text"></p>
+    <div class="actions">
+      <button id="btn-again" class="btn primary" data-i18n="over.again">Spela igen</button>
+      <button id="btn-over-menu" class="btn secondary" data-i18n="over.menu">Till menyn</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

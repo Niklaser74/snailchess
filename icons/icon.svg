@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Snäckschack: a yellow snail with a crown on a chess board -->
+  <defs>
+    <clipPath id="r"><rect x="0" y="0" width="512" height="512" rx="96"/></clipPath>
+  </defs>
+  <g clip-path="url(#r)">
+    <rect width="512" height="512" fill="#8db874"/>
+    <g fill="#efe3c0">
+      <rect x="0" y="0" width="128" height="128"/><rect x="256" y="0" width="128" height="128"/>
+      <rect x="128" y="128" width="128" height="128"/><rect x="384" y="128" width="128" height="128"/>
+      <rect x="0" y="256" width="128" height="128"/><rect x="256" y="256" width="128" height="128"/>
+      <rect x="128" y="384" width="128" height="128"/><rect x="384" y="384" width="128" height="128"/>
+    </g>
+  </g>
+  <!-- snail: foot centred, facing right, ~7x scale of the game sprite -->
+  <g transform="translate(256 400) scale(7.2)" stroke="#4a2e1c" stroke-width="1.6" stroke-linejoin="round">
+    <path d="M-22 0 Q-24 -6 -14 -8 L10 -8 Q24 -12 23 -4 Q24 0 18 0 Z" fill="#e0a878"/>
+    <path d="M4 -6 Q8 -20 18 -20 Q26 -20 24 -12 Q23 -6 16 -6 Z" fill="#e0a878"/>
+    <circle cx="-6" cy="-15" r="13.5" fill="#f0c419"/>
+    <path d="M-4.5 -15.5 a2 2 0 1 1 4 1.2 a5 5 0 1 1 -8.5 -3 a8.5 8.5 0 1 1 5 11" fill="none" stroke="#fff3d6" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M13 -19 Q15 -26 14 -31 M20 -19 Q24 -26 23 -34" fill="none" stroke="#e0a878" stroke-width="3.2" stroke-linecap="round"/>
+    <circle cx="14" cy="-32" r="4.6" fill="#fff" stroke-width="1"/><circle cx="23" cy="-35" r="4.6" fill="#fff" stroke-width="1"/>
+    <circle cx="15.5" cy="-32" r="2.2" fill="#1b1b1b" stroke="none"/><circle cx="24.5" cy="-35" r="2.2" fill="#1b1b1b" stroke="none"/>
+    <path d="M-15 -24 L-15 -35 L-10 -30 L-6 -38 L-2 -30 L3 -35 L3 -24 Z" fill="#f2c94c" stroke-width="1.4"/>
+    <circle cx="-11" cy="-27" r="1.5" fill="#e2453c" stroke="none"/><circle cx="-6" cy="-27" r="1.5" fill="#e2453c" stroke="none"/><circle cx="-1" cy="-27" r="1.5" fill="#e2453c" stroke="none"/>
+  </g>
+</svg>

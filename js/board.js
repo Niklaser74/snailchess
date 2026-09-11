@@ -8,7 +8,7 @@ import { THEMES } from './game/themes.js';
 import { LOOKS, SIDE_COLORS } from './pieces.js';
 
 export const FILES = 'abcdefgh';
-export const SPEEDS = { fast: 0.12, normal: 0.25, snail: 0.6 }; // seconds per square
+export const SPEEDS = { fast: 0.3, normal: 0.6, snail: 1.2 }; // seconds per square
 const LIGHT = '#efe3c0', DARK = '#8db874', FRAME = '#6e4324', FRAME_DARK = '#4a2c16';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
@@ -25,6 +25,7 @@ export class Board {
     this.targets = []; // verbose moves from the selected square
     this.lastMove = null; // { from, to }
     this.checkSquare = null;
+    this.marks = null; // checkmate explanation: { king, attackers: [sq], blocked: [sq] }
     this.badges = true;
     this.coords = true;
     this.speed = SPEEDS.normal;
@@ -90,7 +91,7 @@ export class Board {
   crawl(piece, toSq, opts = {}) {
     const to = Board.fr(toSq);
     const dist = Math.max(Math.abs(to.f - piece.f), Math.abs(to.r - piece.r));
-    const dur = this.reduced ? 0 : clamp(dist * this.speed, 0.3, 3);
+    const dur = this.reduced ? 0 : clamp(dist * this.speed, 0.5, 5);
     return new Promise((resolve) => {
       const done = () => { piece.f = to.f; piece.r = to.r; piece.sq = toSq; if (opts.becomes) piece.type = opts.becomes; resolve(); };
       if (dur === 0) return done();
@@ -120,7 +121,7 @@ export class Board {
     const victim = victimSq ? this.pieceAt(victimSq) : null;
     const jobs = [];
     const dist = Math.max(Math.abs(Board.fr(move.to).f - mover.f), Math.abs(Board.fr(move.to).r - mover.r));
-    const dur = this.reduced ? 0 : clamp(dist * this.speed, 0.3, 3);
+    const dur = this.reduced ? 0 : clamp(dist * this.speed, 0.5, 5);
     if (victim) jobs.push(victimGone ? this.fade(victim) : this.fade(victim, dur * 0.65));
     jobs.push(this.crawl(mover, move.to, { becomes: move.promotion }));
     if (move.flags.includes('k') || move.flags.includes('q')) {
@@ -216,6 +217,23 @@ export class Board {
         ctx.font = `${Math.round(rr * 1.7)}px "Segoe UI Symbol", "DejaVu Sans", system-ui, sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(look.glyph, c.x + rr + 3, c.y + rr + 4);
+      }
+    }
+    // checkmate explanation: the attackers, their lines to the king, and the squares the king cannot use
+    if (this.marks) {
+      const k = Board.fr(this.marks.king), kc = this.cell(k.f, k.r);
+      ctx.strokeStyle = 'rgba(226, 69, 60, 0.9)'; ctx.lineWidth = Math.max(3, sq * 0.07); ctx.lineCap = 'round';
+      for (const s of this.marks.blocked) {
+        const c0 = this.cell(Board.fr(s).f, Board.fr(s).r), pad = sq * 0.3;
+        ctx.beginPath(); ctx.moveTo(c0.x + pad, c0.y + pad); ctx.lineTo(c0.x + sq - pad, c0.y + sq - pad); ctx.moveTo(c0.x + sq - pad, c0.y + pad); ctx.lineTo(c0.x + pad, c0.y + sq - pad); ctx.stroke();
+      }
+      for (const s of this.marks.attackers) {
+        const a = Board.fr(s), ac = this.cell(a.f, a.r);
+        ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = Math.max(4, sq * 0.08);
+        ctx.beginPath(); ctx.arc(ac.x + sq / 2, ac.y + sq / 2, sq * 0.44, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([sq * 0.12, sq * 0.1]);
+        ctx.beginPath(); ctx.moveTo(ac.x + sq / 2, ac.y + sq / 2); ctx.lineTo(kc.x + sq / 2, kc.y + sq / 2); ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
     // legal targets on top of everything

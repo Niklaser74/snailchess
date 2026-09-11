@@ -115,6 +115,8 @@ function startPlaying() {
   selected = null;
   board.setSelection(null);
   board.setPosition(chess.board());
+  board.marks = null;
+  $('mate-note').hidden = true;
   const h = chess.history({ verbose: true });
   board.lastMove = h.length ? { from: h[h.length - 1].from, to: h[h.length - 1].to } : null;
   board.flipped = humanSides.size === 1 && humanSides.has('b');
@@ -180,13 +182,14 @@ async function play(mv) {
   }
   await board.animateMove(move, { victimGone });
   board.setPosition(chess.board()); // reconcile
+  board.marks = null;
   board.lastMove = { from: move.from, to: move.to };
   busy = false;
   afterMove();
 }
 function afterMove() {
   orientForTurn();
-  if (chess.isGameOver()) { over = true; save(); refreshHud(); renderMoves(); return showOver(); }
+  if (chess.isGameOver()) { over = true; save(); refreshHud(); renderMoves(); return finish(); }
   save();
   refreshHud();
   renderMoves();
@@ -252,11 +255,68 @@ async function maybeComputer() {
   let move = null;
   try { move = await askWorker(fen, settings.opponent); }
   catch { const { pickMove } = await import('./ai.js'); move = pickMove(fen, settings.opponent); }
-  const wait = Math.max(0, 400 - (performance.now() - started));
+  const wait = Math.max(0, 900 - (performance.now() - started));
   await new Promise((r) => setTimeout(r, wait));
   busy = false;
   if (chess.fen() !== fen || !move) return; // the game changed underneath (undo, new game)
   play(move);
+}
+
+// ---------- game over ----------
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function finish() {
+  let why = '';
+  if (chess.isCheckmate()) why = await explainMate();
+  showOver(why);
+}
+// Checkmate deserves a moment: replay the mating move slowly, then mark the
+// attackers, their lines to the king and the squares the king cannot use.
+async function explainMate() {
+  const h = chess.history({ verbose: true });
+  const move = h[h.length - 1];
+  const loser = chess.turn(), winner = loser === 'w' ? 'b' : 'w';
+  let king = null;
+  for (const row of chess.board()) for (const p of row) if (p && p.type === 'k' && p.color === loser) king = p.square;
+  const attackers = chess.attackers(king, winner);
+  const { f, r } = Board.fr(king);
+  const blocked = [];
+  for (let df = -1; df <= 1; df++) for (let dr = -1; dr <= 1; dr++) {
+    if (!df && !dr) continue;
+    const ff = f + df, rr = r + dr;
+    if (ff < 0 || ff > 7 || rr < 0 || rr > 7) continue;
+    const s = 'abcdefgh'[ff] + (rr + 1);
+    const p = chess.get(s);
+    if (!p || p.color !== loser) blocked.push(s);
+  }
+  const list = attackers.map((s) => t('mate.attacker', { piece: t('piece.' + chess.get(s).type + '.def'), sq: s })).join(t('mate.and'));
+  const why = t('mate.why', { team: t('team.' + loser), sq: king, attackers: list });
+  busy = true;
+  board.checkSquare = king;
+  $('hud-msg').textContent = t('mate.banner');
+  await sleep(1200);
+  // replay: back to before the move, then crawl again
+  chess.undo();
+  board.setPosition(chess.board());
+  board.lastMove = null;
+  chess.move({ from: move.from, to: move.to, promotion: move.promotion });
+  $('hud-msg').textContent = t('mate.replay');
+  await sleep(700);
+  await board.animateMove(move);
+  board.setPosition(chess.board());
+  board.lastMove = { from: move.from, to: move.to };
+  board.checkSquare = king;
+  board.marks = { king, attackers, blocked };
+  $('hud-msg').textContent = t('mate.banner');
+  $('mate-note').textContent = why + ' ' + t('mate.tap');
+  $('mate-note').hidden = false;
+  await new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); removeEventListener('pointerdown', done); resolve(); };
+    const timer = setTimeout(done, 12000);
+    setTimeout(() => addEventListener('pointerdown', done), 300);
+  });
+  $('mate-note').hidden = true;
+  busy = false;
+  return why;
 }
 
 // ---------- HUD ----------
@@ -284,7 +344,7 @@ function renderMoves() {
   $('moves-list').innerHTML = rows.join('');
   $('moves-list').scrollTop = $('moves-list').scrollHeight;
 }
-function showOver() {
+function showOver(why = '') {
   let text;
   const loser = chess.turn(), winner = loser === 'w' ? 'b' : 'w';
   if (chess.isCheckmate()) text = t('over.mate', { team: t('team.' + winner) });
@@ -294,6 +354,8 @@ function showOver() {
   else if (chess.isDrawByFiftyMoves()) text = t('over.fifty');
   else text = t('over.draw');
   $('over-text').textContent = text;
+  $('over-why').textContent = why;
+  $('over-why').hidden = !why;
   $('over').hidden = false;
 }
 

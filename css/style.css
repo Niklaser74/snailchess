@@ -78,3 +78,7 @@ footer a { color: inherit; }
 .duel-box h2 { margin: 0; color: #fff; font-size: 18px; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
 #duel-canvas { width: 100%; aspect-ratio: 2 / 1; display: block; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.4); background: var(--sky); }
 .duel-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #fff; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
+
+/* ---------- checkmate explanation ---------- */
+.note { position: fixed; left: 50%; bottom: calc(14px + var(--safe-b)); transform: translateX(-50%); width: min(560px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; font-size: 15px; line-height: 1.4; box-shadow: 0 12px 40px rgba(0,0,0,.3); z-index: 5; }
+.why { font-size: 14px; color: var(--muted); line-height: 1.45; }

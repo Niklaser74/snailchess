@@ -38,6 +38,10 @@ const dict = {
     'msg.turn': '{name} siktar…', 'msg.cracked': '{name} sprack!', 'msg.drowned': '{name} drunknade!', 'msg.splash': 'Plums!',
     'msg.win': '{name} vann duellen', 'msg.draw': 'Båda borta…', 'msg.crateHealth': 'En låda faller', 'msg.crateWeapon': 'En låda faller', 'msg.heal': '{name} +35', 'msg.found': '{name} hittade något',
     'aria.mute': 'Ljud av', 'aria.unmute': 'Ljud på',
+    'mate.banner': 'Schackmatt!', 'mate.replay': 'Repris av draget…', 'mate.tap': 'Tryck för att gå vidare',
+    'mate.why': '{team} kung på {sq} står i schack från {attackers}. Kungen har ingen ruta att fly till (röda kryss), ingen pjäs kan slå angriparen och ingen kan ställa sig emellan.',
+    'mate.attacker': '{piece} på {sq}', 'mate.and': ' och ',
+    'piece.k.def': 'kungen', 'piece.q.def': 'damen', 'piece.r.def': 'tornet', 'piece.b.def': 'löparen', 'piece.n.def': 'springaren', 'piece.p.def': 'bonden',
   },
   en: {
     'app.name': 'Snail Chess',
@@ -75,6 +79,10 @@ const dict = {
     'msg.turn': '{name} takes aim…', 'msg.cracked': '{name} cracked!', 'msg.drowned': '{name} drowned!', 'msg.splash': 'Splash!',
     'msg.win': '{name} won the duel', 'msg.draw': 'Both gone…', 'msg.crateHealth': 'A crate is falling', 'msg.crateWeapon': 'A crate is falling', 'msg.heal': '{name} +35', 'msg.found': '{name} found something',
     'aria.mute': 'Sound off', 'aria.unmute': 'Sound on',
+    'mate.banner': 'Checkmate!', 'mate.replay': 'Replay of the move…', 'mate.tap': 'Tap to continue',
+    'mate.why': 'The {team} king on {sq} is in check from {attackers}. The king has no square to run to (red crosses), no piece can capture the attacker and nothing can block.',
+    'mate.attacker': '{piece} on {sq}', 'mate.and': ' and ',
+    'piece.k.def': 'the king', 'piece.q.def': 'the queen', 'piece.r.def': 'the rook', 'piece.b.def': 'the bishop', 'piece.n.def': 'the knight', 'piece.p.def': 'the pawn',
   },
 };
 

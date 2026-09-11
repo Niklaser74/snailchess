@@ -86,7 +86,7 @@ export function createDuel(canvas, spec) {
 // Browser driver: runs the duel on a canvas at real speed and resolves when it
 // is over (plus a moment to look at the empty shell). onSkip() from the UI
 // fast-forwards headlessly.
-export function runDuel(canvas, spec, { holdMs = 1300 } = {}) {
+export function runDuel(canvas, spec, { holdMs = 2000 } = {}) {
   const duel = createDuel(canvas, spec);
   const TICK = 1 / 60;
   let raf = 0, last = 0, acc = 0, skipped = false, finished = false;

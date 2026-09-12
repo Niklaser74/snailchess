@@ -234,7 +234,7 @@ async function play(mv) {
   deselect();
   board.checkSquare = null;
   $('hud-msg').textContent = '';
-  let victimGone = false;
+  let victimGone = false, mover = null;
   const lose = (winner) => {
     kingLost = winner;
     over = true;
@@ -246,6 +246,7 @@ async function play(mv) {
     const victimSq = move.flags.includes('e') ? move.to[0] + move.from[1] : move.to;
     const wasInCheck = (() => { chess.undo(); const c = chess.isCheck(); chess.move(mv); return c; })();
     const kaos = settings.mode === 'kaos' ? { attackerHp: hp[move.from] ?? KAOS_HP, defenderHp: hp[victimSq] ?? KAOS_HP } : null;
+    const attackerPiece = await approach(move);
     const outcome = await duel(move, victimSq, moveNo, settings.mode === 'light', kaos);
     if (outcome.result === 'miss') {
       // battle mode: the piece stays and the turn passes. A missed rescue shot loses the king.
@@ -254,6 +255,7 @@ async function play(mv) {
       chess.move(null);
       events.push('?:' + move.san, '--');
       $('hud-msg').textContent = t('battle.miss');
+      if (attackerPiece) await board.crawl(attackerPiece, move.from); // slinks back
       board.setPosition(chess.board());
       board.lastMove = { from: move.from, to: move.from };
       busy = false;
@@ -265,7 +267,6 @@ async function play(mv) {
       chess.undo();
       const opponent = move.color === 'w' ? 'b' : 'w';
       if (wasInCheck || move.piece === 'k') return lose(opponent);
-      const attackerPiece = board.pieceAt(move.from);
       events.push('?:' + move.san);
       if (!piecesFall(outcome.result === 'draw' ? [move.from, victimSq] : [move.from])) { events.pop(); return lose(opponent); }
       if (outcome.result !== 'draw') hp[victimSq] = outcome.defenderHp;
@@ -282,10 +283,11 @@ async function play(mv) {
     }
     if (kaos) hp[move.from] = outcome.attackerHp;
     victimGone = true;
+    mover = attackerPiece;
   }
   if (settings.mode === 'kaos') carryHp(move);
   events.push(move.san);
-  await board.animateMove(move, { victimGone });
+  await board.animateMove(move, { victimGone, mover });
   board.setPosition(chess.board()); // reconcile
   board.marks = null;
   board.lastMove = { from: move.from, to: move.to };
@@ -308,6 +310,23 @@ async function afterMove(keepMessage = false) {
 }
 
 // ---------- the duel (battle light) ----------
+// The square next to the victim on the attacker's way there (for a knight: the
+// diagonal step back towards where it came from).
+function squareBefore(from, to) {
+  const f0 = from.charCodeAt(0), r0 = +from[1], f1 = to.charCodeAt(0), r1 = +to[1];
+  const df = Math.sign(f0 - f1), dr = Math.sign(r0 - r1);
+  return String.fromCharCode(f1 + df) + (r1 + dr);
+}
+// Before a duel the attacker crawls up next to its victim and both get a
+// moment to see what is coming. Returns the attacker's board piece.
+async function approach(move) {
+  const piece = board.pieceAt(move.from);
+  if (!piece) return null;
+  const pre = squareBefore(move.from, move.to);
+  if (pre !== move.from) await board.crawl(piece, pre);
+  await sleep(600);
+  return piece;
+}
 async function duel(move, victimSq, moveNo, mustWin = true, kaos = null) {
   const victimType = move.captured;
   const attacker = { type: move.piece, color: move.color };
@@ -625,19 +644,22 @@ async function replayPly(ply, moveNo) {
   const san = last === '--' ? tried : last;
   let mv = null;
   if (san) { const probe = new Chess(chess.fen()); mv = probe.move(san); }
+  let attackerPiece = null;
   if (mv && mv.captured && settings.mode !== 'gentle') {
     const victimSq = mv.flags.includes('e') ? mv.to[0] + mv.from[1] : mv.to;
     const kaos = settings.mode === 'kaos' ? { attackerHp: hp[mv.from] ?? KAOS_HP, defenderHp: hp[victimSq] ?? KAOS_HP } : null;
+    attackerPiece = await approach(mv);
     await duel(mv, victimSq, moveNo, settings.mode === 'light', kaos);
   }
   // the board still shows the position before the ply (duel() has already taken the victim off it)
   if (last === '--') {
-    const fallen = ply.filter((e) => e.startsWith('x:')).map((e) => board.pieceAt(e.slice(2))).filter(Boolean);
-    await Promise.all(fallen.map((p) => board.fade(p)));
+    const fallen = ply.filter((e) => e.startsWith('x:')).map((e) => (mv && e.slice(2) === mv.from && attackerPiece ? attackerPiece : board.pieceAt(e.slice(2)))).filter(Boolean);
+    if (fallen.length) await Promise.all(fallen.map((p) => board.fade(p)));
+    else if (attackerPiece) await board.crawl(attackerPiece, mv.from); // a miss: slinks back
     $('hud-msg').textContent = fallen.length ? t('kaos.lost', { piece: mv ? t('piece.' + mv.piece) : '' }) : t('battle.miss');
     if (mv) board.lastMove = { from: mv.from, to: mv.from };
   } else if (mv) {
-    await board.animateMove(mv, { victimGone: !!mv.captured && settings.mode !== 'gentle' });
+    await board.animateMove(mv, { victimGone: !!mv.captured && settings.mode !== 'gentle', mover: attackerPiece });
     board.lastMove = { from: mv.from, to: mv.to };
   }
   chess = chessFrom([...events, ...ply]);

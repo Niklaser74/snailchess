@@ -115,8 +115,8 @@ export class Board {
   // Animate a chess.js verbose move: the mover crawls, a castling rook
   // follows, the victim (also en passant) fades as the attacker arrives.
   // victimGone = true when the duel already took the victim off the board.
-  async animateMove(move, { victimGone = false } = {}) {
-    const mover = this.pieceAt(move.from);
+  async animateMove(move, { victimGone = false, mover = null } = {}) {
+    mover = mover || this.pieceAt(move.from); // the attacker may already have crawled up next to its victim
     if (!mover) return;
     const victimSq = move.flags.includes('e') ? move.to[0] + move.from[1] : (move.captured ? move.to : null);
     const victim = victimSq ? this.pieceAt(victimSq) : null;

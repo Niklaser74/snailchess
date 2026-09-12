@@ -113,7 +113,7 @@ export function hittingVariant(spec, maxTries = 16) {
 // Browser driver: runs the duel on a canvas at real speed and resolves when it
 // is over (plus a moment to look at the empty shell). onSkip() from the UI
 // fast-forwards headlessly.
-export function runDuel(canvas, spec, { holdMs = 2000, mustWin = true, kaos = null, speed = 1 } = {}) {
+export function runDuel(canvas, spec, { holdMs = 2500, mustWin = true, kaos = null, speed = 1 } = {}) {
   const duel = createDuel(canvas, { ...spec, variant: spec.variant ?? (mustWin && !kaos ? hittingVariant(spec) : 0) }, { mustWin, kaos });
   const TICK = 1 / 60;
   let raf = 0, last = 0, acc = 0, skipped = false, finished = false;

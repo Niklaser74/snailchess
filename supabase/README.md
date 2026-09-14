@@ -47,9 +47,12 @@ supabase functions deploy chess-notify-turn --project-ref lygpfumngyebxoqqncet
 eller Supabase MCP `deploy_edge_function` med `index.ts` + `webpush.js`
 (kopia av snailmageddons). `verify_jwt` på.
 
-## Konto delas med Snäckmageddon
+## Kontot är seriens
 
-`js/supa.js` använder medvetet Snäckmageddons `localStorage`-nyckel
-`snackmageddon.session`: allt på snails.se delar origin, så en inloggning per
-enhet räcker för båda spelen, och e-post/Google-koppling görs i Snäckmageddon.
-Det är det enda undantaget från regeln att nycklar prefixas `snailchess.`.
+`js/account.js` är seriens delade Supabase-klient, ägd av hubben
+(`Niklaser74.github.io`) och vendorad hit med `npm run sync:account` — redigera
+den aldrig här. `js/supa.js` re-exporterar den. Sessionen ligger under
+`snails.session` (allt på snails.se delar origin, så en inloggning per enhet
+gäller alla spel); e-post/Google-koppling, namn och utseende sköts på
+https://snails.se/account/. Det är det enda undantaget från regeln att nycklar
+prefixas `snailchess.`.

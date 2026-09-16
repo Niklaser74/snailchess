@@ -135,6 +135,9 @@ export class Board {
 
   // ---------- drawing ----------
   draw(t) {
+    // Reduced motion means still snails too: without this the eye stalks and
+    // heads kept swaying on the idle clock after the crawling had been turned off.
+    if (this.reduced) t = 0;
     const { ctx, W, H, sq, ox, oy, size } = this;
     const th = THEMES.garden;
     const sky = ctx.createLinearGradient(0, 0, 0, H);

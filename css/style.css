@@ -56,8 +56,11 @@ button { font: inherit; }
 .lang button { font-size: 12px; font-weight: 700; border: 0; background: transparent; padding: 4px 10px; border-radius: 999px; cursor: pointer; color: var(--muted); }
 .lang button[aria-pressed="true"] { background: var(--ink); color: #fff; }
 .opts { display: grid; gap: 10px; margin-bottom: 16px; }
-.opts label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
-.opts select { font: inherit; font-weight: 600; color: var(--ink); padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+/* min-width: 0 on both: a grid item is otherwise as wide as its longest option
+   ("Battle – anfallaren måste träffa, annars går turen över"), which pushed the
+   selects out past the panel on a phone */
+.opts label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; font-size: 13px; font-weight: 700; color: var(--muted); }
+.opts select { font: inherit; font-weight: 600; color: var(--ink); padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; width: 100%; min-width: 0; text-overflow: ellipsis; }
 .opts label.check { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink); }
 .opts input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }

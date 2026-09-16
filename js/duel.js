@@ -149,6 +149,18 @@ export function runDuel(canvas, spec, { holdMs = 2500, mustWin = true, kaos = nu
   const variant = replay ? (replay.variant || 0) : (spec.variant ?? (mustWin && !kaos && control === 'ai' ? hittingVariant(spec) : 0));
   const duel = createDuel(canvas, { ...spec, variant }, { mustWin, kaos, control, replay });
   const TICK = 1 / 60;
+  // Overview: the whole arena stays in view, so you can see where the opponent
+  // is and aim at it. The game starts at zoom 1 and follows the active snail,
+  // which on anything narrower than the 900 px arena put the target off screen.
+  // The canvas is 2:1 like the arena, so the game's own lowest zoom shows all of
+  // it. Explosions still punch in and come back here (the punch remembers this
+  // zoom as its base).
+  const g = duel.game;
+  const overview = () => {
+    if (g.cam.punch || !canvas.clientWidth) return;
+    g.cam.zoom = Math.max(canvas.clientWidth / g.W, canvas.clientHeight / g.H);
+  };
+  overview();
   let raf = 0, last = 0, acc = 0, skipped = false, finished = false;
   const ctl = { duel, promise: null, skip: null };
   ctl.promise = new Promise((resolve) => {
@@ -172,9 +184,33 @@ export function runDuel(canvas, spec, { holdMs = 2500, mustWin = true, kaos = nu
       acc += Math.min(0.1, (ts - last) / 1000) * (duel.myTurn() ? 1 : speed); // never rush the player's own aim
       last = ts;
       let n = 0;
+      overview(); // also follows a rotated phone or a resized window
       while (acc >= TICK && n++ < 12 && !duel.done) { duel.tick(); acc -= TICK; }
       duel.game.render();
-      if (duel.done) { setTimeout(finish, holdMs); return; }
+      if (duel.done) {
+        // The simulation stops with the duel, usually in the middle of the
+        // explosion's zoom-in (it lasts ~2.9 s, a hit ends the duel after ~1.4).
+        // Glide back to the overview so the final picture shows what happened.
+        // The timeout decides when we are done, so a throttled tab cannot hang.
+        setTimeout(finish, holdMs);
+        const settle = () => {
+          if (finished) return;
+          g.cam.punch = null;
+          if (canvas.clientWidth) {
+            const fit = Math.max(canvas.clientWidth / g.W, canvas.clientHeight / g.H);
+            g.cam.zoom += (fit - g.cam.zoom) * 0.12;
+          }
+          g.cam.x += (g.W / 2 - g.cam.x) * 0.12;
+          g.cam.y += (g.H / 2 - g.cam.y) * 0.12;
+          // keep the view inside the arena on the way out, as updateCamera() does
+          const hw = canvas.clientWidth / g.cam.zoom / 2, hh = canvas.clientHeight / g.cam.zoom / 2;
+          if (hw > 0) { g.cam.x = Math.min(Math.max(g.cam.x, hw), g.W - hw); g.cam.y = Math.min(Math.max(g.cam.y, hh), g.H - hh); }
+          g.render();
+          raf = requestAnimationFrame(settle);
+        };
+        raf = requestAnimationFrame(settle);
+        return;
+      }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);

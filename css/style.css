@@ -74,9 +74,13 @@ footer a { color: inherit; }
 .promo-row .glyph { font-size: 30px; line-height: 1; }
 
 /* ---------- duel ---------- */
-.duel-box { width: min(960px, 100%); display: grid; gap: 8px; }
+/* The whole duel (title, arena, message, controls) must fit the screen height,
+   or the fire button ends up below the fold on a phone held sideways.
+   --duel-chrome is everything but the canvas. margin: auto instead of the
+   overlay's centring, which cut the top off when the box was too tall. */
+.duel-box { --duel-chrome: 190px; width: min(960px, 100%); display: grid; gap: 8px; margin: auto; }
 .duel-box h2 { margin: 0; color: #fff; font-size: 18px; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
-#duel-canvas { width: 100%; aspect-ratio: 2 / 1; display: block; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.4); background: var(--sky); }
+#duel-canvas { width: min(100%, calc((100vh - var(--duel-chrome)) * 2)); width: min(100%, calc((100dvh - var(--duel-chrome)) * 2)); justify-self: center; aspect-ratio: 2 / 1; display: block; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.4); background: var(--sky); }
 .duel-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #fff; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
 
 /* ---------- checkmate explanation ---------- */
@@ -119,4 +123,15 @@ footer a { color: inherit; }
 @media (max-width: 520px) {
   .dbtn { min-width: 48px; height: 48px; font-size: 19px; padding: 0 8px; }
   .dbtn.fire { min-width: 78px; font-size: 13px; }
+}
+/* short screens (phone held sideways): tighter chrome so the arena stays big */
+@media (max-height: 480px) {
+  #duel.overlay { padding: 8px; }
+  .duel-box { --duel-chrome: 150px; gap: 6px; }
+  .duel-box h2 { font-size: 14px; }
+  .duel-bar { font-size: 13px; }
+  #duel-controls { gap: 6px; }
+  .dpower { height: 8px; }
+  .dbtn { height: 44px; min-width: 50px; font-size: 18px; }
+  .dbtn.fire { min-width: 84px; }
 }

@@ -609,6 +609,11 @@ function refreshHud(keepMessage = false) {
     $('hud-msg').textContent = '';
   }
   $('btn-undo').disabled = chess.history().length === 0 || settings.mode === 'kaos' || !!onlineMatch;
+  // online there is no undo; resigning takes its place in the top bar
+  const canResign = !!onlineMatch && onlineMatch.status !== 'finished' && !over;
+  $('btn-undo').hidden = !!onlineMatch;
+  $('btn-hud-resign').hidden = !canResign;
+  $('btn-hud-resign').disabled = busy;
   refreshMute();
 }
 function renderMoves() {
@@ -862,13 +867,19 @@ $('btn-copy').addEventListener('click', async () => {
 });
 $('btn-share').addEventListener('click', () => { navigator.share({ title: t('app.name'), url: $('wait-link').value }).catch(() => {}); });
 $('btn-wait-menu').addEventListener('click', showMenu);
-$('btn-resign').addEventListener('click', async () => {
-  if (!onlineMatch || !confirm(t('online.resignConfirm'))) return;
+// Resign from the waiting room (their turn) or the top bar (your turn).
+async function resignOnline() {
+  if (!onlineMatch || busy || !confirm(t('online.resignConfirm'))) return;
   try {
     const m = await snigelpost.resign(onlineMatch.id);
     if (m) { push.notify(m.id, 'resigned'); startOnline(m); } else showMenu();
-  } catch (e) { onlineError(e); }
-});
+  } catch (e) {
+    onlineError(e);
+    $('hud-msg').textContent = t('online.error', { msg: e.message });
+  }
+}
+$('btn-resign').addEventListener('click', resignOnline);
+$('btn-hud-resign').addEventListener('click', resignOnline);
 $('btn-timeout').addEventListener('click', async () => {
   if (!onlineMatch) return;
   try { const m = await snigelpost.claimTimeout(onlineMatch.id); push.notify(m.id, 'timeout'); startOnline(m); } catch (e) { onlineError(e); }

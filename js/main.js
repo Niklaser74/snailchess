@@ -84,6 +84,29 @@ $('btn-menu').addEventListener('click', () => { if (busy) return; showMenu(); })
 $('btn-help').addEventListener('click', () => { $('help').hidden = false; });
 $('btn-help-close').addEventListener('click', () => { $('help').hidden = true; });
 $('btn-again').addEventListener('click', () => { $('over').hidden = true; newGame(); });
+$('btn-next').addEventListener('click', () => {
+  const id = onlineMatch && snigelpost.nextMatchId(onlineMatch);
+  if (!id) return;
+  $('over').hidden = true;
+  openMatch(id);
+});
+$('btn-rematch').addEventListener('click', async () => {
+  const m = onlineMatch;
+  if (!m) return;
+  $('btn-rematch').disabled = true;
+  try {
+    const n = await snigelpost.rematch(m.id);
+    // tell the opponent, unless they asked first and this just opened their rematch
+    if (Date.now() - new Date(n.created_at).getTime() < 15000 && n.ply_count === 0) push.notify(n.id, 'rematch');
+    $('over').hidden = true;
+    startOnline(n);
+  } catch (e) {
+    $('over-series').hidden = false;
+    $('over-series').textContent = t('online.error', { msg: e.message });
+  } finally {
+    $('btn-rematch').disabled = false;
+  }
+});
 $('btn-over-menu').addEventListener('click', () => { $('over').hidden = true; showMenu(); });
 $('btn-undo').addEventListener('click', undo);
 $('btn-flip').addEventListener('click', () => { board.flipped = !board.flipped; });
@@ -620,7 +643,32 @@ function showOver(why = '') {
   $('over-text').textContent = text;
   $('over-why').textContent = why;
   $('over-why').hidden = !why;
+  // Snigelpost: the series score and what comes next; a local game just plays again
+  const m = onlineMatch;
+  const line = m ? seriesLine(m) : '';
+  $('over-series').textContent = line;
+  $('over-series').hidden = !line;
+  $('btn-again').hidden = !!m;
+  $('btn-next').hidden = !(m && snigelpost.nextMatchId(m));
+  $('btn-rematch').hidden = !(m && snigelpost.canRematch(m));
   $('over').hidden = false;
+}
+// ---------- series text ----------
+function seriesScore(m) {
+  const s = m.series;
+  return `${s.wins_me}–${s.wins_them}` + (s.draws ? t('series.draws', { n: s.draws }) : '');
+}
+// "game 2 · best of 3 · 1–0" for the list and the waiting room
+function seriesShort(m) {
+  return snigelpost.isSeries(m) ? t('series.short', { no: m.match_no, of: m.series.best_of, score: seriesScore(m) }) : '';
+}
+// the line under a finished game: who took the series, or what happens next
+function seriesLine(m) {
+  if (!snigelpost.isSeries(m)) return '';
+  const s = m.series, score = seriesScore(m);
+  if (s.status === 'finished') return t(s.won_by_me ? 'series.won' : s.lost_by_me ? 'series.lost' : 'series.drawn', { score });
+  if (snigelpost.nextMatchId(m)) return t('series.next', { score, team: t('team.' + (m.my_color === 'w' ? 'b' : 'w')) }); // colours swap
+  return seriesShort(m);
 }
 
 // ---------- Snigelpost (online, one ply at a time) ----------
@@ -640,7 +688,8 @@ async function refreshMatchList() {
       const mine = snigelpost.isMyTurn(m);
       const state = m.status === 'finished' ? t('online.finished') : m.status === 'open' ? t('online.open') : mine ? t('online.yourTurn') : t('online.theirTurn', { name: snigelpost.opponentName(m) });
       const who = snigelpost.opponentName(m) ? t('online.vs', { name: snigelpost.opponentName(m) }) : t('online.noOpponent');
-      return `<li class="mrow${mine ? ' turn' : ''}" data-id="${m.id}"><span class="mwho">${who}<br><small>${t('mode.' + m.mode + '.short')} · ${state}</small></span>` +
+      const series = seriesShort(m);
+      return `<li class="mrow${mine ? ' turn' : ''}" data-id="${m.id}"><span class="mwho">${who}<br><small>${t('mode.' + m.mode + '.short')} · ${state}${series ? '<br>' + series : ''}</small></span>` +
         `<button class="btn secondary mopen">${m.status === 'finished' ? t('online.show') : t('online.play')}</button><button class="icon-btn mdel" aria-label="${t('online.delete')}">✕</button></li>`;
     }).join('') || `<li class="mnone">${t('online.none')}</li>`;
     $('online-status').textContent = '';
@@ -653,12 +702,14 @@ $('online-list').addEventListener('click', async (e) => {
   else if (e.target.closest('.mdel')) { try { await snigelpost.remove(row.dataset.id); } catch (err) { onlineError(err); } refreshMatchList(); }
 });
 $('opt-name').value = store.get('name', '');
+$('opt-bestof').value = String(store.get('bestOf', 3));
+$('opt-bestof').addEventListener('change', () => store.set('bestOf', Number($('opt-bestof').value)));
 $('opt-name').addEventListener('change', () => store.set('name', $('opt-name').value.trim().slice(0, 24)));
 $('btn-online-create').addEventListener('click', async () => {
   readMenu();
   $('online-status').textContent = t('online.loading');
   try {
-    const m = await snigelpost.create(playerName(), settings.mode);
+    const m = await snigelpost.create(playerName(), settings.mode, Number($('opt-bestof').value) || 3);
     startOnline(m);
   } catch (e) { onlineError(e); }
 });
@@ -784,6 +835,9 @@ function showWaiting() {
   const open = m.status === 'open';
   $('wait-title').textContent = open ? t('online.inviteTitle') : t('online.theirTurn', { name: snigelpost.opponentName(m) });
   $('wait-text').textContent = open ? t('online.inviteText') : t('online.waitText', { name: snigelpost.opponentName(m) });
+  const series = seriesShort(m);
+  $('wait-series').textContent = series;
+  $('wait-series').hidden = !series;
   $('wait-link').value = snigelpost.inviteLink(m.id);
   $('wait-link-row').hidden = !open;
   $('btn-share').hidden = !navigator.share || !open;

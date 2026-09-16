@@ -24,13 +24,15 @@ const rest = (path: string, init: RequestInit = {}) =>
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
   });
 
-type Kind = 'turn' | 'joined' | 'finished' | 'resigned' | 'timeout';
-function texts(lang: string | null, name: string): Record<Kind, string> {
+type Kind = 'turn' | 'joined' | 'finished' | 'resigned' | 'timeout' | 'rematch';
+function texts(lang: string | null, name: string): Record<Kind | 'next', string> {
   return lang === 'en'
     ? { turn: `${name} has moved. Your turn!`, joined: `${name} joined your game.`, finished: `The game against ${name} is over.`,
-        resigned: `${name} gave up. You won!`, timeout: `${name} claimed the win after 14 days of silence.` }
+        resigned: `${name} gave up the game.`, timeout: `${name} claimed the game after 14 days of silence.`,
+        rematch: `${name} wants a rematch!`, next: ' The next game has started.' }
     : { turn: `${name} har dragit. Din tur!`, joined: `${name} gick med i ditt parti.`, finished: `Partiet mot ${name} är slut.`,
-        resigned: `${name} gav upp. Du vann!`, timeout: `${name} tog hem vinsten efter 14 dagars tystnad.` };
+        resigned: `${name} gav upp partiet.`, timeout: `${name} tog partiet efter 14 dagars tystnad.`,
+        rematch: `${name} vill ha revansch!`, next: ' Nästa parti har börjat.' };
 }
 
 Deno.serve(async (req) => {
@@ -43,14 +45,14 @@ Deno.serve(async (req) => {
     const { match_id, event } = await req.json();
     if (typeof match_id !== 'string') return json({ error: 'match_id required' }, 400);
 
-    const rows = await (await rest(`snailchess_matches?id=eq.${encodeURIComponent(match_id)}&select=id,host,guest,names,status,turn`)).json();
+    const rows = await (await rest(`snailchess_matches?id=eq.${encodeURIComponent(match_id)}&select=id,host,guest,names,status,turn,series_id`)).json();
     const m = rows[0];
     if (!m) return json({ error: 'no such match' }, 404);
     const me = m.host === uid ? 'w' : m.guest === uid ? 'b' : null;
     if (me === null) return json({ error: 'not your match' }, 403);
     const other = me === 'w' ? m.guest : m.host;
     if (!other) return json({ sent: 0, reason: 'no opponent yet' });
-    const kind: Kind = ['joined', 'resigned', 'timeout'].includes(event) ? event : m.status === 'finished' ? 'finished' : 'turn';
+    const kind: Kind = ['joined', 'resigned', 'timeout', 'rematch'].includes(event) ? event : m.status === 'finished' ? 'finished' : 'turn';
     if (kind === 'turn' && m.turn === me) return json({ sent: 0, reason: 'still your turn' });
 
     const subs = await (await rest(`snails_push_subscriptions?user_id=eq.${other}&select=endpoint,p256dh,auth,lang`)).json();
@@ -62,13 +64,28 @@ Deno.serve(async (req) => {
     const publicKey = b64url(new Uint8Array([4, ...b64urlDecode(jwk.x), ...b64urlDecode(jwk.y)]));
     const vapid = { publicKey, jwk };
 
-    const url = `${GAME}/?match=${m.id}`;
+    // Series (best of 3/5): the score from the receiver's point of view, and the
+    // link opens the game that is on now (a finished game may have a successor).
+    let score = '', next = false, url = `${GAME}/?match=${m.id}`;
+    if (m.series_id) {
+      const srows = await (await rest(`snailchess_series?id=eq.${m.series_id}&select=host,best_of,wins_host,wins_guest,status,current_match`)).json();
+      const s = srows[0];
+      if (s) {
+        const [wm, wt] = s.host === other ? [s.wins_host, s.wins_guest] : [s.wins_guest, s.wins_host];
+        if (s.best_of > 1 || wm + wt > 0) score = ` (${wm}–${wt})`;
+        if (s.status !== 'finished' && s.current_match) {
+          url = `${GAME}/?match=${s.current_match}`;
+          next = s.current_match !== m.id;
+        }
+      }
+    }
     const myName = m.names?.[me] || 'Motståndaren';
     let sent = 0;
     const dead: string[] = [];
     for (const s of subs) {
       const t = texts(s.lang, myName);
-      const payload = { title: s.lang === 'en' ? 'Snail Chess' : 'Snäckschack', body: t[kind], url, tag: `chess-match-${m.id}` };
+      const body = t[kind] + (kind === 'joined' || kind === 'rematch' ? '' : score) + (next ? t.next : '');
+      const payload = { title: s.lang === 'en' ? 'Snail Chess' : 'Snäckschack', body, url, tag: m.series_id ? `chess-series-${m.series_id}` : `chess-match-${m.id}` };
       const status = await sendPush({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, vapid, SITE).catch(() => 0);
       if (status === 201 || status === 200) sent++;
       else if (status === 404 || status === 410) dead.push(s.endpoint);

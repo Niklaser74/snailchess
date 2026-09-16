@@ -102,6 +102,12 @@
       <p class="blurb" data-i18n="online.blurb">Spela mot en kompis i egen takt, i det spelläge som är valt ovan. Skapa ett parti, skicka länken, dra när du hinner.</p>
       <div class="online-row">
         <label><span data-i18n="online.name">Ditt namn</span><input id="opt-name" maxlength="24" autocomplete="nickname"></label>
+        <label class="bestof"><span data-i18n="online.bestOf">Antal partier</span>
+          <select id="opt-bestof">
+            <option value="1" data-i18n="bestOf.1">Ett parti</option>
+            <option value="3" data-i18n="bestOf.3">Bäst av 3</option>
+            <option value="5" data-i18n="bestOf.5">Bäst av 5</option>
+          </select></label>
         <button id="btn-online-create" class="btn secondary" data-i18n="online.create">Skapa parti</button>
       </div>
       <ul id="online-list"></ul>
@@ -172,6 +178,7 @@
 <div id="wait" class="overlay" hidden>
   <div class="panel small">
     <h2 id="wait-title"></h2>
+    <p id="wait-series" class="series-line" hidden></p>
     <p id="wait-text"></p>
     <div id="wait-link-row" class="link-row">
       <input id="wait-link" readonly>
@@ -192,9 +199,12 @@
   <div class="panel small">
     <h2 data-i18n="over.title">Partiet är slut</h2>
     <p id="over-text"></p>
+    <p id="over-series" class="series-line" hidden></p>
     <p id="over-why" class="why" hidden></p>
     <div class="actions">
       <button id="btn-again" class="btn primary" data-i18n="over.again">Spela igen</button>
+      <button id="btn-next" class="btn primary" hidden data-i18n="over.next">Nästa parti</button>
+      <button id="btn-rematch" class="btn primary" hidden data-i18n="over.rematch">Revansch</button>
       <button id="btn-over-menu" class="btn secondary" data-i18n="over.menu">Till menyn</button>
     </div>
   </div>

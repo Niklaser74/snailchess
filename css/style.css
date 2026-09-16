@@ -92,9 +92,12 @@ footer a { color: inherit; }
 #online { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 #online h2 { margin: 0 0 4px; font-size: 18px; }
 #online .blurb { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
-.online-row { display: flex; gap: 8px; align-items: flex-end; }
-.online-row label { flex: 1; display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
-.online-row input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; min-width: 0; }
+.online-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.online-row label { flex: 1 1 140px; display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.online-row label.bestof { flex: 0 1 130px; }
+.online-row input, .online-row select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; min-width: 0; color: var(--ink); }
+.online-row .btn { flex: 1 1 100%; }
+.series-line { margin: 4px 0 8px; font-weight: 800; color: var(--accent); }
 #online-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
 #online-list .mrow { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 #online-list .mrow.turn { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }

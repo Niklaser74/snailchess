@@ -5,7 +5,10 @@ import { online } from './supa.js';
 
 export const snigelpost = {
   available() { return online.available(); },
-  create(name, mode) { return online.rpc('snailchess_create', { p_name: name, p_mode: mode }); },
+  // bestOf 1, 3 or 5: every game belongs to a series; 1 is a single game
+  create(name, mode, bestOf = 3) { return online.rpc('snailchess_create', { p_name: name, p_mode: mode, p_best_of: bestOf }); },
+  // a new series against the same opponent (or the one already running between you)
+  rematch(id) { return online.rpc('snailchess_rematch', { p_match: id }); },
   join(id, name) { return online.rpc('snailchess_join', { p_match: id, p_name: name }); },
   get(id) { return online.rpc('snailchess_get', { p_match: id }); },
   list() { return online.rpc('snailchess_my_matches'); },
@@ -26,6 +29,16 @@ export const snigelpost = {
   },
   isMyTurn(m) { return m.status !== 'finished' && m.my_color === m.turn && !(m.status === 'open' && m.ply_count >= 1); },
   opponentName(m) { return m.names?.[m.my_color === 'w' ? 'b' : 'w'] || ''; },
+  // A real series (best of 3 or 5)? Games from before series existed have none.
+  isSeries(m) { return !!m.series && m.series.best_of > 1; },
+  // The game that is on now in this match's series, when it is another one.
+  nextMatchId(m) {
+    const s = m.series;
+    return s && s.status !== 'finished' && s.current_match && s.current_match !== m.id ? s.current_match : null;
+  },
+  // Rematch makes sense when the whole thing is over: a finished series, or a
+  // finished game that is not part of a running series.
+  canRematch(m) { return m.status === 'finished' && !!m.guest && (!m.series || m.series.status === 'finished'); },
   // days the opponent has been silent on their turn (0 otherwise)
   silentDays(m) {
     if (m.status !== 'playing' || m.turn === m.my_color) return 0;

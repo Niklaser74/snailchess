@@ -22,7 +22,8 @@ ruta; det tar den tid det tar. Fyra lägen:
 
 Spelas mot datorn (tre nivåer), två på samma enhet, eller via **Snigelpost**
 mot en kompis i egen takt (drag, push-notis, spela när det passar; samma
-konto som Snäckmageddon). Offline som installerad PWA. Andra spelet i Knackpots snigelserie på [snails.se](https://snails.se),
+konto som Snäckmageddon), enstaka parti eller serie bäst av 3 eller 5 med
+färgbyte varje parti och revansch efteråt. Offline som installerad PWA. Andra spelet i Knackpots snigelserie på [snails.se](https://snails.se),
 efter [Snäckmageddon](https://github.com/Niklaser74/snailmageddon).
 Adress: **https://snails.se/snailchess/**.
 
@@ -81,6 +82,5 @@ cache-namn börjar med `snailchess-`, `localStorage`-nycklar med
 
 ## Nästa steg
 
-- Revansch och serier (bäst av 3) i Snigelpost, som Snäckmageddon.
 - Granaten som duellvapen när AI:ns kastbana är bättre på små arenor.
 - Stockfish WASM för den som vill ha riktigt motstånd.

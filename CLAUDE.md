@@ -61,6 +61,10 @@ test/                      Node-tester
 - Duellens vapen sätts per tur (`armTurn`): `startTurn()` nollställer till
   bazooka och `fire()` kollar inte ammunition, så en bonde skulle annars skjuta
   fel vapen.
+- Snigelpost-partier hör till serier (`snailchess_series`). Värden i ett parti
+  är alltid Gul, så serien byter värd och gäst varje parti; serieregler och
+  revansch ligger i databasen, klienten visar bara `m.series`. Ändras SQL:en —
+  kör `supabase/tests/series.sql`.
 - Snigelpost skickar en ply i taget som händelser (`?:` försök, `x:` föll, `--`
   turen över); servern kontrollerar tur och form, klienterna reglerna. Se
   `supabase/README.md`.

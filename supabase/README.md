@@ -10,10 +10,34 @@ snailmageddon-repots `supabase/README.md`.
 
 | Objekt | Vad |
 | --- | --- |
-| `snailchess_matches` | ett parti: värd (Gul), gäst (Blå), läge, händelselista `events`, `hp`/`hp_prev` (kaos), `fen`, `result`, `duel` (senaste plyets duell som inspelning) |
-| `snailchess_create/join/get/my_matches/submit/resign/claim_timeout/delete` | hela API:t, `security definer` med kontroll på `auth.uid()`; klienten når aldrig tabellen |
-| `snailchess_cleanup` + cron `snailchess_cleanup` (04:23) | obesvarade inbjudningar efter 30 dagar, avslutade partier efter 90 |
-| edge-funktion `chess-notify-turn` | push "din tur" till motståndaren; läser `snailchess_matches`, skickar via `snails_push_subscriptions` och `snails_vapid_private` |
+| `snailchess_matches` | ett parti: värd (Gul), gäst (Blå), läge, händelselista `events`, `hp`/`hp_prev` (kaos), `fen`, `result`, `duel` (senaste plyets duell som inspelning), `series_id`, `match_no` |
+| `snailchess_series` | en serie mellan två spelare: `best_of` 1/3/5, `wins_host`/`wins_guest`, `draws`, `current_match`, `status`, `winner_user`. Serievärden är bara "spelare A" — färgen står i partiet |
+| `snailchess_create/join/get/my_matches/submit/resign/claim_timeout/delete/rematch` | hela API:t, `security definer` med kontroll på `auth.uid()`; klienten når aldrig tabellerna |
+| `snailchess_series_after_finish`, `snailchess_series_next_match` | interna: räknar ett avslutat parti och startar nästa eller stänger serien |
+| `snailchess_cleanup` + cron `snailchess_cleanup` (04:23) | obesvarade inbjudningar efter 30 dagar, avslutade serier och partier efter 90 |
+| edge-funktion `chess-notify-turn` | push "din tur" till motståndaren med seriens ställning; länken går till partiet som pågår nu. Läser `snailchess_matches`/`snailchess_series`, skickar via `snails_push_subscriptions` och `snails_vapid_private` |
+
+## Serier och revansch
+
+Samma modell som Snäckmageddon (`snailmageddon/supabase/migrations/20260904210000_series.sql`),
+med två skillnader för schack:
+
+- **Färgerna byts.** Värden i ett parti spelar alltid Gul och drar först, så
+  nästa parti byter värd och gäst. Revansch startas av den som var Blå sist.
+- **Remi räknas men ger ingen poäng.** Serien fortsätter, men stängs efter
+  `best_of * 2` partier så att en rad remier inte pågår för evigt; ledaren vinner
+  då, annars slutar serien oavgjord. Bäst av 1 stängs direkt vid remi.
+
+Varje nytt parti hör till en serie (bäst av 1 för ett enskilt parti). Partier
+från före serierna saknar `series_id` och behandlas som bäst av 1.
+`snailchess_my_matches` visar bara seriens pågående parti. `snailchess_rematch`
+återanvänder en serie som redan pågår mellan de två, så båda som klickar på
+Revansch hamnar i samma.
+
+`tests/series.sql` provar hela kedjan med två påhittade spelare (färgbyte, remi,
+serieslut, revansch från båda håll, remitaket, radering). Kör den med MCP
+`execute_sql`; den rullar alltid tillbaka och slutar med ett avsiktligt fel som
+börjar med `ALL OK` när allt gick igenom.
 
 Delat och orört: `snails_push_subscriptions`, `snails_save_push`,
 `snails_remove_push`, `snails_vapid_private`.

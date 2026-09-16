@@ -2,7 +2,7 @@
 // duel is over within the tick budget, and the same capture replays the same.
 //   node test/duel.test.mjs
 import assert from 'node:assert/strict';
-import { createDuel, duelSeed, duelTheme, hittingVariant, DUEL_WEAPONS } from '../js/duel.js';
+import { createDuel, duelSeed, duelTheme, hittingVariant, duelRecording, weaponsFor, DUEL_WEAPONS } from '../js/duel.js';
 import { LOOKS } from '../js/pieces.js';
 
 let failed = 0;
@@ -106,6 +106,74 @@ test('kaos: both shoot, hp carries in, the duel ends with a winner (or both gone
     if (d.result === 'defender') assert.ok(d.defender.alive && !d.attacker.alive);
   }
   assert.ok(res.attacker > 0, 'a wounded queen should lose to a fresh pawn now and then');
+});
+
+// A hand-played duel: aim up for a while, then hold fire to charge and let go.
+function playByHand(spec, opts, { aimTicks = 30, chargeTicks = 45 } = {}) {
+  const d = createDuel(null, spec, { control: 'me', ...opts });
+  const g = d.game;
+  let n = 0;
+  for (let i = 0; i < aimTicks && !d.done; i++) { g.input.up = true; d.tick(); }
+  g.input.up = false;
+  for (let i = 0; i < chargeTicks && !d.done; i++) { g.input.fire = true; d.tick(); }
+  g.input.fire = false;
+  while (!d.done && n++ < 60 * 200) d.tick();
+  return d;
+}
+
+test('aiming it yourself: the attacker has no computer, and nothing happens until you fire', () => {
+  const spec = { attacker: { type: 'r', color: 'w' }, defender: { type: 'n', color: 'b' }, from: 'a1', to: 'a8', moveNo: 7 };
+  const idle = createDuel(null, spec, { mustWin: false, control: 'me' });
+  assert.equal(idle.game.ai, null, 'the player aims, not the computer');
+  assert.ok(idle.myTurn(), 'the duel waits for the player');
+  assert.ok(idle.canFire());
+  for (let i = 0; i < 60 * 10; i++) idle.tick();
+  assert.equal(idle.game.hasFired, false, 'no shot without input');
+  // sitting on your hands until the clock runs out is a miss
+  let n = 0;
+  while (!idle.done && n++ < 60 * 60) idle.tick();
+  assert.equal(idle.result, 'miss');
+
+  const shot = playByHand(spec, { mustWin: false });
+  assert.equal(shot.game.hasFired, true, 'holding fire shoots');
+  assert.ok(['attacker', 'miss'].includes(shot.result));
+  assert.equal(shot.myTurn(), false, 'the duel is over');
+});
+
+test('a hand-played duel replays tick for tick from its recording (Snigelpost)', () => {
+  for (const [mode, opts] of [['battle', { mustWin: false }], ['kaos', { mustWin: false, kaos: { attackerHp: 60, defenderHp: 60 } }]]) {
+    const spec = { attacker: { type: 'q', color: 'w' }, defender: { type: 'r', color: 'b' }, from: 'd1', to: 'd7', moveNo: 4 };
+    const live = playByHand(spec, opts);
+    const rec = duelRecording(live);
+    assert.ok(rec.inputs.length > 1, `${mode}: the inputs should be recorded`);
+    assert.ok(JSON.stringify(rec).length < 20000, `${mode}: the recording must stay small`);
+    // the other device rebuilds the duel from the same spec plus the recording
+    const rerun = createDuel(null, { ...spec, variant: rec.variant }, { ...opts, control: 'ai', replay: rec });
+    assert.equal(rerun.game.ai, null, `${mode}: no AI during a replay`);
+    let n = 0;
+    while (!rerun.done && n++ < 60 * 200) rerun.tick();
+    assert.equal(rerun.result, live.result, `${mode}: the replay ended differently`);
+    assert.equal(rerun.game.tickCount, live.game.tickCount, `${mode}: the replay took another number of ticks`);
+    assert.equal(rerun.game.stateHash(), live.game.stateHash(), `${mode}: the replay diverged`);
+    assert.equal(rerun.myTurn(), false, `${mode}: a replay is never the player's turn`);
+  }
+});
+
+test('everyone keeps a weapon: the slime runs out in kaos, the bazooka does not', () => {
+  assert.deepEqual(weaponsFor('p', false), ['slem']);
+  assert.deepEqual(weaponsFor('p', true), ['slem', 'bazooka']);
+  assert.deepEqual(weaponsFor('r', true), ['bazooka']);
+  const d = createDuel(null, { attacker: { type: 'p', color: 'w' }, defender: { type: 'n', color: 'b' }, from: 'e2', to: 'd3', moveNo: 9 }, { mustWin: false, kaos: { attackerHp: 60, defenderHp: 60 } });
+  assert.equal(d.game.teams[0].ammo.bazooka, Infinity, 'a pawn falls back on the bazooka in kaos');
+  assert.equal(d.game.weaponId, 'slem', 'but starts on its own weapon');
+  assert.equal(d.game.teams[0].ammo.granat, 0, 'and never gets the ones it should not have');
+  const mine = createDuel(null, { attacker: { type: 'p', color: 'w' }, defender: { type: 'n', color: 'b' }, from: 'e2', to: 'd3', moveNo: 9 }, { mustWin: false, kaos: { attackerHp: 60, defenderHp: 60 }, control: 'me' });
+  for (let i = 0; i < 120; i++) mine.tick();
+  assert.equal(mine.game.weaponId, 'slem', 'the reserve bazooka must not take over the pawn turn');
+  let n = 0;
+  while (!d.done && n++ < 60 * 200) d.tick();
+  assert.ok(d.done, 'a kaos duel must end, not stall when the slime runs out');
+  assert.notEqual(d.result, 'draw');
 });
 
 if (failed) { console.log(`\n${failed} test(s) failed`); process.exit(1); }

@@ -2,7 +2,8 @@
 // Computer: js/ai.js in a worker. Battle light duels: js/duel.js.
 import { Chess } from './vendor/chess.js';
 import { Board, SPEEDS } from './board.js';
-import { runDuel } from './duel.js';
+import { runDuel, duelRecording } from './duel.js';
+import { WEAPONS } from './game/game.js';
 import { t, setLang, detectLang } from './i18n.js';
 import { SIDE_COLORS } from './pieces.js';
 import { setMuted, isMuted, unlockAudio } from './game/audio.js';
@@ -17,7 +18,7 @@ const store = {
   del(k) { try { localStorage.removeItem('snailchess.' + k); } catch { /* ignore */ } },
 };
 
-const DEFAULTS = { mode: 'gentle', opponent: 'normal', side: 'w', speed: 'normal', hints: true, badges: true, flip: false };
+const DEFAULTS = { mode: 'gentle', opponent: 'normal', side: 'w', speed: 'normal', hints: true, badges: true, flip: false, aimSelf: true };
 let settings = { ...DEFAULTS, ...store.get('settings', {}) };
 if (settings.mode === 'battle' && settings.v !== 2) settings.mode = 'light'; // "battle" meant battle light before the battle mode existed
 settings.v = 2;
@@ -30,6 +31,7 @@ let events = [];
 // Snigelpost: the match being played over the net (null = local game) and where my current ply started in events
 let onlineMatch = null;
 let plyStart = 0;
+let lastDuel = null; // the recording of this ply's duel, sent with it so the opponent sees the same shot
 let chess = new Chess();
 let humanSides = new Set(['w', 'b']);
 let busy = false;
@@ -45,7 +47,7 @@ board.onSquare = onSquare;
 
 // ---------- menu ----------
 const fields = ['mode', 'opponent', 'side', 'speed'];
-const flags = ['hints', 'badges', 'flip'];
+const flags = ['hints', 'badges', 'flip', 'aimSelf'];
 function readMenu() {
   for (const f of fields) settings[f] = $('opt-' + f).value;
   for (const f of flags) settings[f] = $('opt-' + f).checked;
@@ -234,6 +236,7 @@ async function play(mv) {
   deselect();
   board.checkSquare = null;
   $('hud-msg').textContent = '';
+  lastDuel = null;
   let victimGone = false, mover = null;
   const lose = (winner) => {
     kingLost = winner;
@@ -248,6 +251,7 @@ async function play(mv) {
     const kaos = settings.mode === 'kaos' ? { attackerHp: hp[move.from] ?? KAOS_HP, defenderHp: hp[victimSq] ?? KAOS_HP } : null;
     const attackerPiece = await approach(move);
     const outcome = await duel(move, victimSq, moveNo, settings.mode === 'light', kaos);
+    lastDuel = outcome.recording;
     if (outcome.result === 'miss') {
       // battle mode: the piece stays and the turn passes. A missed rescue shot loses the king.
       chess.undo();
@@ -327,24 +331,106 @@ async function approach(move) {
   await sleep(600);
   return piece;
 }
-async function duel(move, victimSq, moveNo, mustWin = true, kaos = null) {
+// ---------- aiming it yourself ----------
+const DUEL_ICONS = Object.fromEntries(WEAPONS.map((w) => [w.id, w.icon]));
+const DUEL_KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', a: 'left', d: 'right', w: 'up', s: 'down', ' ': 'fire', Enter: 'fire' };
+// Releasing always goes through; pressing only when the game is waiting for you,
+// so a held key during the computer's shot cannot disturb it.
+function duelInput(key, on) {
+  const d = duelCtl?.duel;
+  if (!d) return;
+  if (on && (!d.myTurn() || (key === 'fire' && !d.canFire()))) return;
+  d.game.input[key] = on;
+}
+function markButton(key, on) {
+  const b = document.querySelector(`#duel-controls .dbtn[data-duel="${key}"]`);
+  if (b) b.classList.toggle('down', on);
+}
+function releaseDuelKeys() {
+  const d = duelCtl?.duel;
+  if (d) for (const k of ['left', 'right', 'up', 'down', 'fire']) d.game.input[k] = false;
+  document.querySelectorAll('#duel-controls .dbtn').forEach((b) => b.classList.remove('down'));
+}
+addEventListener('keydown', (e) => {
+  if ($('duel').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = DUEL_KEYS[e.key];
+  if (!k) return;
+  e.preventDefault();
+  if (e.repeat) return;
+  duelInput(k, true);
+  markButton(k, true);
+});
+addEventListener('keyup', (e) => {
+  const k = DUEL_KEYS[e.key];
+  if (!k) return;
+  duelInput(k, false);
+  markButton(k, false);
+});
+for (const b of document.querySelectorAll('#duel-controls .dbtn[data-duel]')) {
+  const key = b.dataset.duel;
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('down'); duelInput(key, true); });
+  const up = () => { b.classList.remove('down'); duelInput(key, false); };
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointercancel', up);
+  b.addEventListener('lostpointercapture', up);
+}
+$('btn-duel-weapon').addEventListener('click', () => {
+  const d = duelCtl?.duel;
+  if (!d || !d.canFire()) return;
+  const list = d.weapons();
+  if (list.length < 2) return;
+  d.game.input.weapon = list[(list.indexOf(d.game.weaponId) + 1) % list.length];
+});
+function refreshDuelHud() {
+  const d = duelCtl?.duel;
+  if (!d) return;
+  const g = d.game;
+  const mine = d.myTurn();
+  const msg = g.message;
+  $('duel-msg').textContent = d.canFire() ? t('duel.yourShot') : (mine ? t('duel.retreat') : (msg && msg.key ? t(msg.key, msg) : ''));
+  $('duel-controls').hidden = !mine;
+  $('btn-duel-skip').hidden = mine;
+  const aiming = mine && g.phase === 'aim';
+  $('duel-timer').hidden = !aiming;
+  if (aiming) {
+    $('duel-timer').textContent = Math.ceil(g.timer);
+    $('duel-timer').classList.toggle('low', g.timer <= 5);
+  }
+  $('duel-power').style.width = (g.charging ? g.power * 100 : 0) + '%';
+  const list = d.weapons();
+  const wb = $('btn-duel-weapon');
+  wb.hidden = list.length < 2;
+  if (!wb.hidden) { wb.textContent = DUEL_ICONS[g.weaponId] || '🚀'; wb.setAttribute('aria-label', t('aria.weapon')); }
+  const fire = document.querySelector('#duel-controls .dbtn.fire');
+  if (fire) fire.disabled = !d.canFire();
+}
+
+// You aim and fire your own snail in battle and kaos; the defender is always
+// the computer, so the same rules hold on one device, against the computer and
+// in Snigelpost (where the opponent is not there to shoot back).
+function duelControl(color) {
+  return settings.aimSelf && (settings.mode === 'battle' || settings.mode === 'kaos') && humanSides.has(color) ? 'me' : 'ai';
+}
+async function duel(move, victimSq, moveNo, mustWin = true, kaos = null, replay = null) {
   const victimType = move.captured;
   const attacker = { type: move.piece, color: move.color };
   const defender = { type: victimType, color: move.color === 'w' ? 'b' : 'w' };
   const name = (p) => `${t('piece.' + p.type)} (${t('team.' + p.color)})`;
+  const control = replay ? 'ai' : duelControl(move.color);
   $('duel-title').textContent = t('duel.title', { attacker: name(attacker), defender: name(defender) });
   $('duel-msg').textContent = '';
+  $('duel-controls').hidden = true;
+  $('btn-duel-skip').hidden = false;
   $('duel').hidden = false;
-  duelCtl = runDuel($('duel-canvas'), { attacker, defender, from: move.from, to: move.to, moveNo, names: { attacker: t('piece.' + attacker.type), defender: t('piece.' + defender.type) } }, { mustWin, kaos, speed: kaos ? 1.8 : 1 });
-  const msgTimer = setInterval(() => {
-    const m = duelCtl?.duel.game.message;
-    $('duel-msg').textContent = m && m.key ? t(m.key, m) : '';
-  }, 100);
+  duelCtl = runDuel($('duel-canvas'), { attacker, defender, from: move.from, to: move.to, moveNo, names: { attacker: t('piece.' + attacker.type), defender: t('piece.' + defender.type) } }, { mustWin, kaos, speed: kaos ? 1.8 : 1, control, replay });
+  const msgTimer = setInterval(refreshDuelHud, 50);
   const result = await duelCtl.promise;
   const d = duelCtl.duel;
-  const outcome = { result, attackerHp: Math.max(0, d.attacker.hp), defenderHp: Math.max(0, d.defender.hp) };
+  const outcome = { result, attackerHp: Math.max(0, d.attacker.hp), defenderHp: Math.max(0, d.defender.hp), recording: duelRecording(d) };
   clearInterval(msgTimer);
+  releaseDuelKeys();
   $('duel').hidden = true;
+  $('duel-controls').hidden = true;
   duelCtl = null;
   if (result === 'attacker' || result === 'draw') {
     const victim = board.pieceAt(victimSq);
@@ -649,7 +735,7 @@ async function replayPly(ply, moveNo) {
     const victimSq = mv.flags.includes('e') ? mv.to[0] + mv.from[1] : mv.to;
     const kaos = settings.mode === 'kaos' ? { attackerHp: hp[mv.from] ?? KAOS_HP, defenderHp: hp[victimSq] ?? KAOS_HP } : null;
     attackerPiece = await approach(mv);
-    await duel(mv, victimSq, moveNo, settings.mode === 'light', kaos);
+    await duel(mv, victimSq, moveNo, settings.mode === 'light', kaos, onlineMatch?.duel || null);
   }
   // the board still shows the position before the ply (duel() has already taken the victim off it)
   if (last === '--') {
@@ -683,7 +769,7 @@ async function submitPly() {
   }
   $('hud-msg').textContent = t('online.sending');
   try {
-    onlineMatch = await snigelpost.submit(m, mine, chess.fen(), hp, result);
+    onlineMatch = await snigelpost.submit(m, mine, chess.fen(), hp, result, lastDuel);
     store.set('seen.' + m.id, onlineMatch.ply_count);
     push.notify(m.id, over ? 'finished' : 'turn');
     if (!over) showWaiting();

@@ -1,4 +1,4 @@
-# Supabase för Snäckschack
+X# Supabase för Snäckschack
 
 Samma projekt som Snäckmageddon: **`snails`** (`lygpfumngyebxoqqncet`,
 eu-north-1, Knackpot AB). Konton, push-prenumerationer och VAPID-nyckeln
@@ -10,7 +10,7 @@ snailmageddon-repots `supabase/README.md`.
 
 | Objekt | Vad |
 | --- | --- |
-| `snailchess_matches` | ett parti: värd (Gul), gäst (Blå), läge, händelselista `events`, `hp`/`hp_prev` (kaos), `fen`, `result` |
+| `snailchess_matches` | ett parti: värd (Gul), gäst (Blå), läge, händelselista `events`, `hp`/`hp_prev` (kaos), `fen`, `result`, `duel` (senaste plyets duell som inspelning) |
 | `snailchess_create/join/get/my_matches/submit/resign/claim_timeout/delete` | hela API:t, `security definer` med kontroll på `auth.uid()`; klienten når aldrig tabellen |
 | `snailchess_cleanup` + cron `snailchess_cleanup` (04:23) | obesvarade inbjudningar efter 30 dagar, avslutade partier efter 90 |
 | edge-funktion `chess-notify-turn` | push "din tur" till motståndaren; läser `snailchess_matches`, skickar via `snails_push_subscriptions` och `snails_vapid_private` |
@@ -28,8 +28,12 @@ Ett drag i taget (`p_ply` = `ply_count + 1`). Varje ply är 1–5 strängar:
 - `--` — turen går över utan drag
 
 Servern kontrollerar tur, ordning och form. Reglerna avgörs i klienterna, som
-båda spelar upp listan; duellerna är deterministiska (seed från drag och rutor,
-`hp_prev` för kaos), så motståndarens duell kan visas i repris.
+båda spelar upp listan. Duellen följer med i `p_duel`:
+`{ variant, rulesVersion, seed, inputs }` — arenan plus varje knapptryck båda
+sniglarna gjorde. I battle och kaos siktar spelaren själv, så seedet räcker
+inte längre; motståndaren spelar upp inspelningen i stället (`hp_prev` ger
+kaos-duellen rätt hp att börja på). Gamla partier utan `duel` spelas upp från
+seedet som förut.
 
 ## Migrationer
 

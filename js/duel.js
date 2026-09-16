@@ -15,6 +15,12 @@ import { LOOKS, SIDE_COLORS } from './pieces.js';
 export const DUEL_WEAPONS = {
   p: ['slem'], n: ['slem'], b: ['bazooka'], r: ['bazooka'], q: ['bazooka', 'slem'], k: ['bazooka'],
 };
+// In kaos a snail shoots several times, so everyone falls back on the bazooka
+// when the slime runs out. The order is the order of the weapon button.
+export function weaponsFor(type, kaos = false) {
+  const own = DUEL_WEAPONS[type] || DUEL_WEAPONS.q;
+  return kaos && !own.includes('bazooka') ? [...own, 'bazooka'] : own;
+}
 export const ARENA = { width: 900, height: 450 };
 const DEFENDER_HP = 15; // any hit is enough
 const MAX_TICKS = 60 * 45; // safety net: nothing in a duel takes longer than this
@@ -54,13 +60,31 @@ export function duelConfig(spec) {
 // miss is a miss and the duel ends with result 'miss'.
 // kaos: { attackerHp, defenderHp } — both snails shoot in turn until one falls,
 // hp carried over from earlier duels; result attacker | defender | draw.
-export function createDuel(canvas, spec, { mustWin = true, kaos = null } = {}) {
+// control: 'me' hands the attacker to the player (battle and kaos); the
+// defender is always the computer. replay: a recording from duelRecording(),
+// which drives both snails and disables the AI — that is how the opponent sees
+// your shot in Snigelpost.
+export function createDuel(canvas, spec, { mustWin = true, kaos = null, control = 'ai', replay = null } = {}) {
   const config = duelConfig(spec);
   if (kaos) config.teams[1].ai = 'hard';
-  const duel = { game: null, attacker: null, defender: null, done: false, result: null, forced: false };
+  if (control === 'me') config.teams[0].ai = false;
+  const duel = { game: null, attacker: null, defender: null, done: false, result: null, forced: false, variant: spec.variant || 0 };
+  // Each turn starts on the piece's own weapon: startTurn() resets to the
+  // bazooka, and fire() does not check ammo, so a pawn would otherwise shoot
+  // one. Runs on both the live and the replaying device, so it stays in step.
+  const armTurn = (g) => {
+    if (!g.active) return;
+    const ids = weaponsFor(g.active.team === 0 ? spec.attacker.type : spec.defender.type, !!kaos);
+    const team = g.teams[g.active.team];
+    // emptyInput() asks for the bazooka every turn, so set both: otherwise a
+    // pawn with a bazooka in reserve (kaos) would switch away from its slime.
+    g.weaponId = ids.find((id) => team.ammo[id] > 0) || ids[0];
+    g.input.weapon = g.weaponId;
+  };
   duel.game = new Game(canvas, config, {
+    onTurn: armTurn,
     onGameOver: (winner) => { duel.done = true; duel.result = winner && winner.index === 0 ? 'attacker' : (winner ? 'defender' : 'draw'); },
-  });
+  }, { replay: replay ? { rulesVersion: replay.rulesVersion, seed: replay.seed, inputs: replay.inputs } : null });
   const g = duel.game;
   duel.attacker = g.teams[0].snails[0];
   duel.defender = g.teams[1].snails[0];
@@ -70,13 +94,21 @@ export function createDuel(canvas, spec, { mustWin = true, kaos = null } = {}) {
   if (kaos) duel.attacker.hp = kaos.attackerHp;
   g.say({ key: 'msg.turn', name: duel.attacker.name }, 2); // startTurn() already said it with the snail's random name
   // only the piece's own weapons
-  const allowed = new Set(DUEL_WEAPONS[spec.attacker.type] || DUEL_WEAPONS.q);
-  for (const w of g.weapons) if (!allowed.has(w.id)) g.teams[0].ammo[w.id] = 0;
-  const allowedDef = new Set(DUEL_WEAPONS[spec.defender.type] || DUEL_WEAPONS.q);
-  for (const w of g.weapons) if (!allowedDef.has(w.id)) g.teams[1].ammo[w.id] = 0;
+  for (const [i, type] of [spec.attacker.type, spec.defender.type].entries()) {
+    const allowed = new Set(weaponsFor(type, !!kaos));
+    for (const w of g.weapons) if (!allowed.has(w.id)) g.teams[i].ammo[w.id] = 0;
+  }
+  // kaos: several shots each, so nobody runs dry and stalls the duel
+  if (kaos) for (const team of g.teams) team.ammo.bazooka = Infinity;
+  armTurn(g); // the constructor's first turn ran before the ammo above was set
   // face each other
   duel.attacker.facing = 1;
   duel.defender.facing = -1;
+  // Is the duel waiting for the player? Walking is allowed while retreating too.
+  duel.myTurn = () => control === 'me' && !replay && !g.ai && !duel.done && g.active === duel.attacker
+    && duel.attacker.alive && (g.phase === 'aim' || g.phase === 'retreat');
+  duel.canFire = () => duel.myTurn() && g.phase === 'aim' && !g.hasFired;
+  duel.weapons = () => weaponsFor(spec.attacker.type, !!kaos).filter((id) => g.teams[0].ammo[id] > 0);
 
   // One simulation step plus the "attacker always wins" guarantee.
   duel.tick = () => {
@@ -113,8 +145,9 @@ export function hittingVariant(spec, maxTries = 16) {
 // Browser driver: runs the duel on a canvas at real speed and resolves when it
 // is over (plus a moment to look at the empty shell). onSkip() from the UI
 // fast-forwards headlessly.
-export function runDuel(canvas, spec, { holdMs = 2500, mustWin = true, kaos = null, speed = 1 } = {}) {
-  const duel = createDuel(canvas, { ...spec, variant: spec.variant ?? (mustWin && !kaos ? hittingVariant(spec) : 0) }, { mustWin, kaos });
+export function runDuel(canvas, spec, { holdMs = 2500, mustWin = true, kaos = null, speed = 1, control = 'ai', replay = null } = {}) {
+  const variant = replay ? (replay.variant || 0) : (spec.variant ?? (mustWin && !kaos && control === 'ai' ? hittingVariant(spec) : 0));
+  const duel = createDuel(canvas, { ...spec, variant }, { mustWin, kaos, control, replay });
   const TICK = 1 / 60;
   let raf = 0, last = 0, acc = 0, skipped = false, finished = false;
   const ctl = { duel, promise: null, skip: null };
@@ -136,7 +169,7 @@ export function runDuel(canvas, spec, { holdMs = 2500, mustWin = true, kaos = nu
     const frame = (ts) => {
       if (skipped || finished) return;
       if (!last) last = ts;
-      acc += Math.min(0.1, (ts - last) / 1000) * speed;
+      acc += Math.min(0.1, (ts - last) / 1000) * (duel.myTurn() ? 1 : speed); // never rush the player's own aim
       last = ts;
       let n = 0;
       while (acc >= TICK && n++ < 12 && !duel.done) { duel.tick(); acc -= TICK; }
@@ -147,4 +180,11 @@ export function runDuel(canvas, spec, { holdMs = 2500, mustWin = true, kaos = nu
     raf = requestAnimationFrame(frame);
   });
   return ctl;
+}
+
+// What the other device needs to see this exact duel: the arena (variant and
+// seed) and every input both snails made. Small — a turn records only changes.
+export function duelRecording(duel) {
+  const g = duel.game;
+  return { variant: duel.variant, rulesVersion: g.rulesVersion, seed: g.seed, inputs: g.recording.inputs };
 }

@@ -88,6 +88,7 @@
       <label class="check"><input type="checkbox" id="opt-hints"> <span data-i18n="menu.hints">Visa lagliga drag</span></label>
       <label class="check"><input type="checkbox" id="opt-badges"> <span data-i18n="menu.badges">Pjäsmärken i rutorna</span></label>
       <label class="check"><input type="checkbox" id="opt-flip"> <span data-i18n="menu.flip">Vänd brädet mot den som ska dra</span></label>
+      <label class="check"><input type="checkbox" id="opt-aimSelf"> <span data-i18n="menu.aimSelf">Sikta själv i battle och kaos</span></label>
     </div>
     <div class="actions">
       <button id="btn-continue" class="btn secondary" hidden data-i18n="menu.continue">Fortsätt partiet</button>
@@ -146,7 +147,23 @@
     <canvas id="duel-canvas"></canvas>
     <div class="duel-bar">
       <span id="duel-msg"></span>
+      <span id="duel-timer" class="duel-timer" hidden></span>
       <button id="btn-duel-skip" class="btn secondary" data-i18n="duel.skip">Hoppa över</button>
+    </div>
+    <div id="duel-controls" hidden>
+      <div class="dpower"><div id="duel-power"></div></div>
+      <div class="dpads">
+        <div class="dpad">
+          <button class="dbtn" data-duel="left" data-i18n-aria="aria.left" aria-label="Vänster">←</button>
+          <button class="dbtn" data-duel="right" data-i18n-aria="aria.right" aria-label="Höger">→</button>
+        </div>
+        <div class="dpad">
+          <button id="btn-duel-weapon" class="dbtn wpn" hidden></button>
+          <button class="dbtn" data-duel="down" data-i18n-aria="aria.aimDown" aria-label="Sikta ner">↓</button>
+          <button class="dbtn" data-duel="up" data-i18n-aria="aria.aimUp" aria-label="Sikta upp">↑</button>
+          <button class="dbtn fire" data-duel="fire" data-i18n="duel.fire">SKJUT</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

@@ -101,3 +101,22 @@ footer a { color: inherit; }
 #online-list .mnone { color: var(--muted); font-size: 13px; padding: 6px 2px; }
 .link-row { display: flex; gap: 6px; margin: 10px 0 12px; flex-wrap: wrap; }
 .link-row input { flex: 1 1 100%; font: inherit; font-size: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+
+/* ---------- duel controls (battle and kaos: you aim and fire yourself) ---------- */
+.duel-timer { font-variant-numeric: tabular-nums; font-weight: 900; font-size: 20px; color: #fff; min-width: 2ch; text-align: right; }
+.duel-timer.low { color: #ff6b6b; }
+#duel-controls { display: grid; gap: 8px; }
+.dpower { height: 10px; border-radius: 5px; background: rgba(255,255,255,.22); overflow: hidden; }
+#duel-power { height: 100%; width: 0; background: linear-gradient(90deg, #ffd54f, #ff6b3d); transition: width .05s linear; }
+.dpads { display: flex; justify-content: space-between; gap: 10px; }
+.dpad { display: flex; gap: 8px; }
+.dbtn { min-width: 58px; height: 54px; padding: 0 12px; border: none; border-radius: 12px; background: rgba(255,255,255,.28); color: #fff; font-size: 22px; font-weight: 800; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.dbtn:active, .dbtn.down { background: rgba(255,255,255,.55); }
+.dbtn.fire { min-width: 96px; background: rgba(226,69,60,.8); font-size: 15px; }
+.dbtn.fire.down { background: rgba(255,120,80,.95); }
+.dbtn.fire:disabled { opacity: .4; }
+.dbtn.wpn { font-size: 22px; background: rgba(255,255,255,.18); }
+@media (max-width: 520px) {
+  .dbtn { min-width: 48px; height: 48px; font-size: 19px; padding: 0 8px; }
+  .dbtn.fire { min-width: 78px; font-size: 13px; }
+}

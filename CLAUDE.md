@@ -51,6 +51,16 @@ test/                      Node-tester
   fallen pjäs tas bort med `chess.remove` och sedan `new Chess(fen)` — chess.js
   `history()`/`pgn()` spelar om dragen och skulle annars återuppväcka den.
   `test/duel.test.mjs` låser alla tre.
+- I battle och kaos siktar och skjuter spelaren själv (`control: 'me'`,
+  inställningen `aimSelf`); försvararen är alltid datorn, så regeln är samma
+  på en enhet, mot datorn och i Snigelpost. Battle light är alltid datorn —
+  `hittingVariant` kräver ett förutsägbart skott.
+- Ett skott spelas in (`duelRecording`) och följer med draget i Snigelpost, så
+  motståndaren ser exakt din duell. `test/duel.test.mjs` låser att en
+  handspelad duell spelas upp tick för tick.
+- Duellens vapen sätts per tur (`armTurn`): `startTurn()` nollställer till
+  bazooka och `fire()` kollar inte ammunition, så en bonde skulle annars skjuta
+  fel vapen.
 - Snigelpost skickar en ply i taget som händelser (`?:` försök, `x:` föll, `--`
   turen över); servern kontrollerar tur och form, klienterna reglerna. Se
   `supabase/README.md`.

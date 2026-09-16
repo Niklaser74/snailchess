@@ -10,13 +10,15 @@ ruta; det tar den tid det tar. Fyra lägen:
   där anfallaren skjuter på försvararen. Schackreglerna har redan avgjort
   utgången, så anfallaren vinner alltid: duellen är deterministisk per drag,
   och varianter provas headless tills skottet faktiskt träffar.
-- **Battle** – anfallaren måste träffa. Miss = pjäsen står kvar och turen
-  går över (ett nolldrag, `--` i draglistan). Missar räddningsskottet när man
-  står i schack faller kungen. Inte längre riktigt schack.
-- **Kaos** – båda skjuter växelvis tills en faller. Skadan sitter kvar på
-  pjäsen mellan duellerna (sprickor i skalet, hp-stapel), faller anfallaren
-  lämnar den brädet och turen går över. Ingen ångra. Mer Snäckmageddon än
+- **Battle** – anfallaren måste träffa, och **du siktar och skjuter själv**:
+  ↑ ↓ siktar, ← → går, håll SKJUT för kraft, 20 sekunder på dig. Miss = pjäsen
+  står kvar och turen går över (ett nolldrag, `--` i draglistan). Missar
+  räddningsskottet när man står i schack faller kungen. Inte längre riktigt
   schack.
+- **Kaos** – båda skjuter växelvis tills en faller. Du sköter din egen snigel
+  (försvararen är datorn), skadan sitter kvar på pjäsen mellan duellerna
+  (sprickor i skalet, hp-stapel), faller anfallaren lämnar den brädet och turen
+  går över. Ingen ångra. Mer Snäckmageddon än schack.
 
 Spelas mot datorn (tre nivåer), två på samma enhet, eller via **Snigelpost**
 mot en kompis i egen takt (drag, push-notis, spela när det passar; samma

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node test/paths.test.mjs && node test/rules.test.mjs && node test/duel.test.mjs && node test/sw.test.mjs",
+    "test": "node test/paths.test.mjs && node test/rules.test.mjs && node test/duel.test.mjs && node test/sw.test.mjs && node test/escape.test.mjs",
     "sync:game": "node scripts/sync-game.mjs",
     "icons": "node scripts/icons.mjs",
     "og:image": "node scripts/og-image.mjs",

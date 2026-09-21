@@ -12,6 +12,10 @@ import { push } from './push.js';
 import { getLang } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
+// Anything from the server goes through this before it reaches innerHTML: move
+// events and opponent names are written by the other player.
+const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESCAPES[c]);
 const store = {
   get(k, d) { try { const v = localStorage.getItem('snailchess.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem('snailchess.' + k, JSON.stringify(v)); } catch { /* private mode */ } },
@@ -622,9 +626,9 @@ function renderMoves() {
   let fell = [];
   let tried = '';
   for (const e of events) {
-    if (e.startsWith('x:')) { fell.push(e.slice(2)); continue; }
-    if (e.startsWith('?:')) { tried = e.slice(2); continue; }
-    h.push(e === '--' ? `<i>${tried ? tried + ' ' : ''}${fell.length ? '💥' + fell.join('+') : t('moves.miss')}</i>` : e);
+    if (e.startsWith('x:')) { fell.push(esc(e.slice(2))); continue; }
+    if (e.startsWith('?:')) { tried = esc(e.slice(2)); continue; }
+    h.push(e === '--' ? `<i>${tried ? tried + ' ' : ''}${fell.length ? '💥' + fell.join('+') : t('moves.miss')}</i>` : esc(e));
     fell = []; tried = '';
   }
   const rows = [];
@@ -691,8 +695,10 @@ async function refreshMatchList() {
     const list = await snigelpost.list();
     $('online-list').innerHTML = list.map((m) => {
       const mine = snigelpost.isMyTurn(m);
-      const state = m.status === 'finished' ? t('online.finished') : m.status === 'open' ? t('online.open') : mine ? t('online.yourTurn') : t('online.theirTurn', { name: snigelpost.opponentName(m) });
-      const who = snigelpost.opponentName(m) ? t('online.vs', { name: snigelpost.opponentName(m) }) : t('online.noOpponent');
+      const opponent = snigelpost.opponentName(m);
+      const name = esc(opponent);
+      const state = m.status === 'finished' ? t('online.finished') : m.status === 'open' ? t('online.open') : mine ? t('online.yourTurn') : t('online.theirTurn', { name });
+      const who = opponent ? t('online.vs', { name }) : t('online.noOpponent');
       const series = seriesShort(m);
       return `<li class="mrow${mine ? ' turn' : ''}" data-id="${m.id}"><span class="mwho">${who}<br><small>${t('mode.' + m.mode + '.short')} · ${state}${series ? '<br>' + series : ''}</small></span>` +
         `<button class="btn secondary mopen">${m.status === 'finished' ? t('online.show') : t('online.play')}</button><button class="icon-btn mdel" aria-label="${t('online.delete')}">✕</button></li>`;

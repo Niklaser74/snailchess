@@ -58,6 +58,10 @@ export async function offline(page) {
 // sides castled, nothing taken yet. The picture of what the game looks like.
 export const ITALIAN = ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Bc5', 'c3', 'Nf6', 'd3', 'd6', 'O-O', 'O-O'];
 
+// The language comes from the url (?lang=en), so the same poses make both sets of pictures.
+const langOf = (url) => new URL(url).searchParams.get('lang') || 'sv';
+const NAMES = { sv: 'Snäcka', en: 'Shelly' };
+
 const SETTINGS = { mode: 'gentle', opponent: 'human', side: 'w', speed: 'fast', hints: true, badges: true, flip: false, aimSelf: true, v: 2 };
 
 // Opens a saved local game. moves: the event list (SAN), mode: the game mode,
@@ -66,14 +70,15 @@ const SETTINGS = { mode: 'gentle', opponent: 'human', side: 'w', speed: 'fast', 
 export async function stage(page, url, { moves = ITALIAN, mode = 'gentle', hp = {} } = {}) {
   await offline(page);
   await page.goto(url, { waitUntil: 'networkidle' });
-  await page.evaluate(({ moves, mode, hp, settings }) => {
+  const lang = langOf(url);
+  await page.evaluate(({ moves, mode, hp, settings, lang, name }) => {
     localStorage.clear();
     localStorage.setItem('snails.session', JSON.stringify({ access_token: 'pose.eyJzdWIiOiJwb3NlIn0.pose', refresh_token: 'pose', expires_at: Date.now() + 1e10, user_id: 'pose' }));
-    localStorage.setItem('snailchess.lang', 'sv');
-    localStorage.setItem('snailchess.name', JSON.stringify('Snäcka'));
+    localStorage.setItem('snailchess.lang', lang);
+    localStorage.setItem('snailchess.name', JSON.stringify(name));
     localStorage.setItem('snailchess.settings', JSON.stringify({ ...settings, mode }));
     localStorage.setItem('snailchess.game', JSON.stringify({ moves, hp, settings: { mode, opponent: 'human' }, humanSides: ['w', 'b'], over: false }));
-  }, { moves, mode, hp, settings: SETTINGS });
+  }, { moves, mode, hp, settings: SETTINGS, lang, name: NAMES[lang] });
   await page.reload({ waitUntil: 'networkidle' });
   await page.click('#btn-continue');
   await page.waitForFunction(() => document.getElementById('menu').hidden && window.snailchess && !window.snailchess.busy);
@@ -84,13 +89,14 @@ export async function stage(page, url, { moves = ITALIAN, mode = 'gentle', hp = 
 export async function menu(page, url, mode = 'battle') {
   await offline(page);
   await page.goto(url, { waitUntil: 'networkidle' });
-  await page.evaluate(({ mode, settings }) => {
+  const lang = langOf(url);
+  await page.evaluate(({ mode, settings, lang, name }) => {
     localStorage.clear();
     localStorage.setItem('snails.session', JSON.stringify({ access_token: 'pose.eyJzdWIiOiJwb3NlIn0.pose', refresh_token: 'pose', expires_at: Date.now() + 1e10, user_id: 'pose' }));
-    localStorage.setItem('snailchess.lang', 'sv');
-    localStorage.setItem('snailchess.name', JSON.stringify('Snäcka'));
+    localStorage.setItem('snailchess.lang', lang);
+    localStorage.setItem('snailchess.name', JSON.stringify(name));
     localStorage.setItem('snailchess.settings', JSON.stringify({ ...settings, mode }));
-  }, { mode, settings: SETTINGS });
+  }, { mode, settings: SETTINGS, lang, name: NAMES[lang] });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForFunction(() => document.getElementById('online-list').textContent.length > 0);
   await page.waitForTimeout(300);

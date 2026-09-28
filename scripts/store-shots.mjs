@@ -8,22 +8,27 @@
 // (scripts/pose.mjs) and every duel from a fixed capture, so a rerun gives the
 // same pictures.
 //
-//   npm run shots
+//   npm run shots          svenska: docs/store/screenshots/, cover-630x500.png
+//   npm run shots -- en    English: docs/store/screenshots/en/, cover-630x500-en.png
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { root, playwright, serve, stage, menu, tap } from './pose.mjs';
 
-const out = join(root, 'docs', 'store', 'screenshots');
+const lang = process.argv[2] === 'en' ? 'en' : 'sv';
+const out = lang === 'en' ? join(root, 'docs', 'store', 'screenshots', 'en') : join(root, 'docs', 'store', 'screenshots');
 mkdirSync(out, { recursive: true });
 
 const port = Number(process.env.PORT) || 8095;
 const server = serve(port);
-const url = `http://localhost:${port}/?lang=sv`;
+const url = `http://localhost:${port}/?lang=${lang}`;
+const COVER = { sv: ['Snäckschack', 'Schack med sniglar'], en: ['Snail Chess', 'Chess with snails'] }[lang];
 
+const EN_NAMES = {"1-bradet.png":"1-board.png","2-sikta.png":"2-aim.png","3-schackmatt.png":"3-checkmate.png","4-kaos.png":"4-chaos.png","5-menyn.png":"5-menu.png","6-bred.png":"6-wide.png"};
 const shot = async (page, name) => {
+  if (lang === 'en') name = EN_NAMES[name];
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, name) });
-  console.log('wrote docs/store/screenshots/' + name);
+  console.log('wrote ' + join(out, name));
 };
 const phone = (browser) => browser.newPage({ viewport: { width: 1080 / 3, height: 1920 / 3 }, deviceScaleFactor: 3, reducedMotion: 'reduce' });
 
@@ -82,7 +87,7 @@ try {
   await tap(page, 'f7');
   await page.waitForFunction(() => {
     const note = document.getElementById('mate-note');
-    return !note.hidden && /stå kvar/.test(document.getElementById('mate-text').textContent);
+    return !note.hidden && /stå kvar|cannot stay/.test(document.getElementById('mate-text').textContent);
   }, null, { timeout: 30000 });
   await shot(page, '3-schackmatt.png');
   await page.close();
@@ -130,15 +135,18 @@ try {
       box-shadow: 0 16px 40px rgba(0,0,0,0.16); }
     .cover-cap span { display: block; font-size: 19px; font-weight: 800; margin-top: 10px; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.35); }
   ` });
-  await page.evaluate(() => {
+  await page.evaluate(([title, sub]) => {
     const cap = document.createElement('div');
     cap.className = 'cover-cap';
-    cap.innerHTML = '<b>Snäckschack</b><span>Schack med sniglar</span>';
+    const b = document.createElement('b'), span = document.createElement('span');
+    b.textContent = title; span.textContent = sub;
+    cap.append(b, span);
     document.body.append(cap);
-  });
+  }, COVER);
   await page.waitForTimeout(700);
-  await page.screenshot({ path: join(root, 'docs', 'store', 'cover-630x500.png') });
-  console.log('wrote docs/store/cover-630x500.png');
+  const cover = lang === 'en' ? 'cover-630x500-en.png' : 'cover-630x500.png';
+  await page.screenshot({ path: join(root, 'docs', 'store', cover) });
+  console.log('wrote docs/store/' + cover);
   await page.close();
 
   await browser.close();

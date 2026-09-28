@@ -7,7 +7,8 @@ tre butiker i; Snäckschack har färre, och skälen står nedan.
 | --- | --- |
 | `itch.md` | Sidtext för itch.io, svenska och engelska |
 | `cover-630x500.png` | Omslaget till itch, genereras med `npm run shots` |
-| `screenshots/` | Pressbilder, genereras med `npm run shots` |
+| `screenshots/` | Pressbilder på svenska, genereras med `npm run shots` |
+| `screenshots/en/`, `cover-630x500-en.png` | Samma bilder och omslag på engelska (`1-board`, `2-aim`, `3-checkmate`, `4-chaos`, `5-menu`, `6-wide`), `npm run shots -- en` |
 | `../../icons/og-1200x630.png` | Delningsbilden (`og:image`), genereras med `npm run og:image` |
 
 ## Pressbilderna
@@ -27,6 +28,7 @@ tre butiker i; Snäckschack har färre, och skälen står nedan.
 npx playwright install chromium   # en gång, i hubbrepot
 npm run og:image                  # icons/og-1200x630.png
 npm run shots                     # docs/store/screenshots/*.png och omslaget
+npm run shots -- en               # docs/store/screenshots/en/*.png och cover-630x500-en.png
 ```
 
 Båda scripten stagar partierna genom `scripts/pose.mjs`: fasta draglistor,

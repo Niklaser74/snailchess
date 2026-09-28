@@ -35,6 +35,33 @@
     <h2 data-i18n="moves.title">Drag</h2>
     <ol id="moves-list"></ol>
   </aside>
+  <!-- Learn chess: the lesson in progress -->
+  <aside id="learn-bar" hidden>
+    <div class="learn-head">
+      <button id="learn-back" class="btn secondary" data-i18n="learn.back">Lektioner</button>
+      <h2 id="learn-title"></h2>
+      <span id="learn-step" class="learn-step"></span>
+      <button id="learn-exit" class="icon-btn" data-i18n-aria="aria.menu" aria-label="Meny">☰</button>
+    </div>
+    <p id="learn-intro" class="learn-intro"></p>
+    <p id="learn-goal" class="learn-goal"></p>
+    <p id="learn-hint" class="learn-hint" hidden></p>
+    <p id="learn-status" class="learn-status" aria-live="polite"></p>
+    <div class="actions">
+      <button id="learn-restart" class="btn secondary" data-i18n="learn.restart">Börja om steget</button>
+      <button id="learn-next" class="btn primary" hidden data-i18n="learn.next">Nästa</button>
+    </div>
+  </aside>
+</div>
+
+<!-- Learn chess: the lessons -->
+<div id="learn-pick" class="overlay" hidden>
+  <div class="panel">
+    <h2 data-i18n="learn.title">Lär dig schack</h2>
+    <p class="tagline" data-i18n="learn.lead"></p>
+    <div id="learn-list" class="learn-list"></div>
+    <div class="actions"><button id="learn-pick-exit" class="btn secondary" data-i18n="learn.menu">Till menyn</button></div>
+  </div>
 </div>
 
 <!-- HUD -->
@@ -101,6 +128,7 @@
     <div class="actions">
       <button id="btn-continue" class="btn secondary" hidden data-i18n="menu.continue">Fortsätt partiet</button>
       <button id="btn-start" class="btn primary" data-i18n="menu.start">Nytt parti</button>
+      <button id="btn-learn" class="btn secondary" data-i18n="learn.open">Lär dig schack</button>
       <button id="btn-help" class="btn secondary" data-i18n="menu.help">Så spelar du</button>
       <button id="btn-install" class="btn secondary" hidden data-i18n="menu.install">Installera app</button>
     </div>

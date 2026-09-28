@@ -20,6 +20,12 @@ ruta; det tar den tid det tar. Fyra lägen:
   (sprickor i skalet, hp-stapel), faller anfallaren lämnar den brädet och turen
   går över. Ingen ångra. Mer Snäckmageddon än schack.
 
+**Lär dig schack** – tolv korta lektioner, en sak i taget: pjäserna (kryp till
+salladen, ta de blå sniglarna), schack, ur schack (fly, ställ emellan, slå),
+matt, rockad och en passant. Stjärnor efter antal drag eller försök, sparas
+lokalt (`snailchess.learn`). Blå drar aldrig; lektionerna ligger som data i
+`js/lessons.js` och testet bevisar att varje steg går att klara.
+
 Spelas mot datorn (tre nivåer), två på samma enhet, eller via **Snigelpost**
 mot en kompis i egen takt (drag, push-notis, spela när det passar; samma
 konto som Snäckmageddon), enstaka parti eller serie bäst av 3 eller 5 med
@@ -32,7 +38,7 @@ Adress: **https://snails.se/snailchess/**.
 | Vad | Kommando |
 | --- | --- |
 | Utveckling | `npm start` → http://localhost:8082/ |
-| Tester | `npm test` (sökvägar, dator, dueller, service worker) |
+| Tester | `npm test` (sökvägar, dator, dueller, service worker, lektioner) |
 | Hämta motorn från Snäckmageddon | `npm run sync:game` (`GAME_DIR=../dev-snailmageddon`) |
 | PNG-ikoner från `icons/icon.svg` | `npm run icons` (använder hubbrepots Playwright, `PLAYWRIGHT_DIR`) |
 | Deploy | push till `main` → `.github/workflows/pages.yml` |
@@ -46,6 +52,7 @@ index.html, css/style.css    meny, HUD, draglista, duell-overlay, hjälp, game o
 js/main.js                   spelflöde: meny → parti → duell → game over, spara/fortsätt, PWA
 js/board.js                  brädet i Canvas: rutor, markeringar, sniglar som kryper
 js/duel.js                   battle light: bygger en Game från js/game/ med duell-config
+js/lessons.js, js/learn.js   Lär dig schack: lektionerna som data + regler, och lektionsvyn
 js/ai.js, js/ai-worker.js    datormotstånd (negamax med alfa-beta, i en Web Worker)
 js/pieces.js                 pjäs → hatt, storlek, glyf; Gul/Blå = Snäckmageddons lagfärger
 js/i18n.js                   sv/en

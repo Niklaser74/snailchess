@@ -10,6 +10,7 @@ import { setMuted, isMuted, unlockAudio } from './game/audio.js';
 import { snigelpost } from './online.js';
 import { push } from './push.js';
 import { getLang } from './i18n.js';
+import { createLearn } from './learn.js';
 
 const $ = (id) => document.getElementById(id);
 // Anything from the server goes through this before it reaches innerHTML: move
@@ -44,10 +45,12 @@ let selected = null;
 let duelCtl = null;
 
 setLang(detectLang());
-document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); refreshHud(); }));
+document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); refreshHud(); learn.refresh(); }));
 
 const board = new Board($('board'));
 board.onSquare = onSquare;
+// Learn chess borrows the board; leaving it puts the game's position back under the menu.
+const learn = createLearn({ board, onExit: () => { board.setPosition(chess.board()); showMenu(); } });
 
 // ---------- menu ----------
 const fields = ['mode', 'opponent', 'side', 'speed'];
@@ -73,6 +76,7 @@ writeMenu();
 applySettings();
 
 function showMenu() {
+  learn.close();
   const saved = store.get('game', null);
   $('btn-continue').hidden = !(saved && saved.moves && saved.moves.length && !saved.over);
   $('menu').hidden = false;
@@ -86,6 +90,7 @@ $('btn-start').addEventListener('click', () => { readMenu(); newGame(); });
 $('btn-continue').addEventListener('click', () => { readMenu(); if (!resumeGame()) newGame(); });
 $('btn-menu').addEventListener('click', () => { if (busy) return; showMenu(); });
 $('btn-help').addEventListener('click', () => { $('help').hidden = false; });
+$('btn-learn').addEventListener('click', () => { readMenu(); $('menu').hidden = true; learn.open(); });
 $('btn-help-close').addEventListener('click', () => { $('help').hidden = true; });
 $('btn-again').addEventListener('click', () => { $('over').hidden = true; newGame(); });
 $('btn-next').addEventListener('click', () => {

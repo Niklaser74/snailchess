@@ -24,6 +24,8 @@ och fortsätt inte som om de var gröna.
 index.html, js/main.js     UI, meny, spelflöde, spara/fortsätt
 js/board.js                brädet — ritar med js/game/snails.js, vet inget om reglerna
 js/duel.js                 battle light — kör Snäckmageddons Game med duell-config
+js/lessons.js              Lär dig schack: lektioner som data, bara regler (testas i test/lessons.test.mjs)
+js/learn.js                lektionsväljare och lektionsvy; lånar brädet, rör aldrig det sparade partiet
 js/ai.js                   datorn — negamax på chess.js internals (se kommentaren i filen)
 js/vendor/chess.js         reglerna, pinnad 1.4.0
 js/supa.js                 KOPIA från snailmageddon (delar sessionsnyckel med det, medvetet)
@@ -71,6 +73,10 @@ test/                      Node-tester
 - Sparat parti är händelselistan `events` (SAN, `--` = nolldrag, `x:e4` =
   pjäs föll), inte PGN — chess.js kan inte läsa in nolldrag från PGN, och
   borttagna pjäser finns inte i dess historik.
+- Lektioner (`js/lessons.js`): Gul drar alltid, Blå aldrig. Brädet laddas med
+  `skipValidation` (kungar behövs inte). Ett nytt steg måste klara
+  `test/lessons.test.mjs`: går att lösa, inte alla drag löser det, text på båda
+  språken. `par()` använder chess.js internals som `ai.js` – håll den snabb.
 - Följ befintliga mönster i koden framför generella best practices. Ser något
   udda ut finns det oftast ett skäl — fråga innan du rättar det.
 

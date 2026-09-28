@@ -27,6 +27,7 @@ export class Board {
     this.checkSquare = null;
     this.marks = null; // checkmate explanation: { king, attackers: [sq], blocked: [sq] }
     this.hp = null; // kaos: hp by square (missing = unhurt); cracks and a small bar
+    this.lettuce = null; // learn mode: Set of squares with a lettuce leaf to eat
     this.badges = true;
     this.coords = true;
     this.speed = SPEEDS.normal;
@@ -184,6 +185,11 @@ export class Board {
       ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = Math.max(3, sq * 0.06);
       ctx.strokeRect(c.x + ctx.lineWidth / 2, c.y + ctx.lineWidth / 2, sq - ctx.lineWidth, sq - ctx.lineWidth);
     }
+    // lettuce (learn mode), under the snails so the one eating it covers it
+    if (this.lettuce) for (const s of this.lettuce) {
+      const { f, r } = Board.fr(s); const c = this.cell(f, r);
+      drawLettuce(ctx, c.x + sq / 2, c.y + sq * 0.58, sq * 0.3, t + f + r);
+    }
     // animations
     const tn = now();
     for (const a of this.anims) {
@@ -255,4 +261,28 @@ export class Board {
       else { ctx.beginPath(); ctx.arc(c.x + sq / 2, c.y + sq / 2, sq * 0.13, 0, Math.PI * 2); ctx.fill(); }
     }
   }
+}
+
+// A lettuce leaf: a few overlapping frilly lobes around a pale midrib, swaying a little.
+function drawLettuce(ctx, x, y, r, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(t * 1.3) * 0.06);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+  ctx.beginPath(); ctx.ellipse(0, r * 0.85, r * 0.9, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+  const lobes = [[-0.45, 0.1, '#5da83a'], [0.45, 0.1, '#5da83a'], [-0.25, -0.35, '#7cc24e'], [0.25, -0.35, '#7cc24e'], [0, 0.15, '#8fd460']];
+  for (const [lx, ly, col] of lobes) {
+    ctx.fillStyle = col;
+    ctx.strokeStyle = '#3d7a22'; ctx.lineWidth = Math.max(1, r * 0.06);
+    ctx.beginPath();
+    for (let i = 0; i <= 14; i++) {
+      const a = (i / 14) * Math.PI * 2, wob = 1 + 0.12 * Math.sin(a * 7);
+      const px = lx * r + Math.cos(a) * r * 0.55 * wob, py = ly * r + Math.sin(a) * r * 0.5 * wob;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.strokeStyle = '#d9f0b8'; ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, r * 0.75); ctx.lineTo(0, -r * 0.35); ctx.stroke();
+  ctx.restore();
 }

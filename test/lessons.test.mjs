@@ -3,6 +3,9 @@
 import assert from 'node:assert/strict';
 import { LESSONS, ROUNDS, load, allowedMoves, goalMet, par, stars, solvingMove, yellowAgain, remaining } from '../js/lessons.js';
 import { keysOf } from '../js/i18n.js';
+// the lesson view needs a DOM to run, but it must at least load: nothing else here imports it
+import { createLearn } from '../js/learn.js';
+assert.equal(typeof createLearn, 'function');
 
 let failed = 0;
 function test(name, fn) {
@@ -112,7 +115,7 @@ test('every lesson and hint has its words, in both languages', () => {
   const keys = new Set(['learn.goal.eat', 'learn.goal.capture', 'learn.goal.check', 'learn.goal.escape', 'learn.goal.mate', 'learn.goal.castle', 'learn.goal.enpassant', 'learn.goal.promote']);
   for (const l of LESSONS) {
     keys.add(`learn.${l.id}.title`); keys.add(`learn.${l.id}.intro`);
-    for (const s of l.stages) if (s.hint) keys.add(s.hint);
+    for (const s of l.stages) for (const h of [s.hint || []].flat()) keys.add(h);
   }
   for (const k of keys) { assert.ok(sv.has(k), `sv is missing ${k}`); assert.ok(en.has(k), `en is missing ${k}`); }
 });

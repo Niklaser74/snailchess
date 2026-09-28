@@ -94,6 +94,7 @@ const dict = {
     'learn.escape.take': 'Slå: ta pjäsen som hotar kungen.',
     'learn.castle.short': 'Kort rockad: kungen tar två steg mot tornet i närmaste hörnet.',
     'learn.castle.long': 'Lång rockad: kungen tar två steg mot tornet längst bort.',
+    'learn.castle.rule': 'Bara om varken kungen eller tornet har flyttat, och kungen inte står i schack.',
     'piece.k.def': 'kungen', 'piece.q.def': 'damen', 'piece.r.def': 'tornet', 'piece.b.def': 'löparen', 'piece.n.def': 'springaren', 'piece.p.def': 'bonden',
   },
   en: {
@@ -188,6 +189,7 @@ const dict = {
     'learn.escape.take': 'Capture: take the piece attacking the king.',
     'learn.castle.short': 'Short castling: the king takes two steps towards the nearer rook.',
     'learn.castle.long': 'Long castling: the king takes two steps towards the far rook.',
+    'learn.castle.rule': 'Only if neither the king nor the rook has moved, and the king is not in check.',
     'piece.k.def': 'the king', 'piece.q.def': 'the queen', 'piece.r.def': 'the rook', 'piece.b.def': 'the bishop', 'piece.n.def': 'the knight', 'piece.p.def': 'the pawn',
   },
 };

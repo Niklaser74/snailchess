@@ -79,7 +79,7 @@ export function createLearn({ board, onExit }) {
     $('learn-step').textContent = t('learn.stage', { n: si + 1, of: l.stages.length });
     $('learn-intro').textContent = t(`learn.${l.id}.intro`);
     $('learn-goal').textContent = t(`learn.goal.${s.goal}`);
-    $('learn-hint').textContent = s.hint ? t(s.hint) : '';
+    $('learn-hint').textContent = [s.hint || []].flat().map((k) => t(k)).join('\n');
     $('learn-hint').hidden = !s.hint;
     $('learn-next').textContent = si + 1 < l.stages.length ? t('learn.next') : li + 1 < LESSONS.length ? t('learn.nextLesson') : t('learn.back');
   }

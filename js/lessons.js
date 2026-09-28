@@ -11,6 +11,7 @@
 //   castle     castle (the position only allows the side taught)
 //   enpassant  take en passant
 //   promote    reach the last rank with a pawn
+// hint: a key, or a list of keys shown as lines, under the goal.
 // only: the one piece type that may move (the rest are there to be jumped over).
 // Boards without kings are fine: they are loaded with skipValidation.
 import { Chess } from './vendor/chess.js';
@@ -66,8 +67,8 @@ export const LESSONS = [
     { fen: '6rk/6pp/8/4N3/8/8/8/6K1 w - - 0 1', goal: 'mate' },
   ] },
   { id: 'castle', piece: 'k', stages: [
-    { fen: '4k3/8/8/8/8/8/8/4K2R w K - 0 1', goal: 'castle', hint: 'learn.castle.short' },
-    { fen: '4k3/8/8/8/8/8/8/R3K3 w Q - 0 1', goal: 'castle', hint: 'learn.castle.long' },
+    { fen: '4k3/8/8/8/8/8/8/4K2R w K - 0 1', goal: 'castle', hint: ['learn.castle.short', 'learn.castle.rule'] },
+    { fen: '4k3/8/8/8/8/8/8/R3K3 w Q - 0 1', goal: 'castle', hint: ['learn.castle.long', 'learn.castle.rule'] },
   ] },
   { id: 'enpassant', piece: 'p', stages: [
     { fen: '4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1', goal: 'enpassant' },

@@ -3,6 +3,7 @@
 **Titel:** Snäckschack
 **Adress:** knackpot.itch.io/snailchess
 **Kort beskrivning (tagline):** Schack med sniglar. Pjäserna kryper till sin ruta, och slagen kan avgöras i en duell.
+**Tagline (English):** Chess with snails. The pieces crawl to their square, and captures can be settled in a duel.
 **Klassificering:** HTML5-spel, gratis (betala vad du vill, förslag 20 kr)
 **Genre:** Strategy · Taggar: chess, learn-chess, snails, board-game, turn-based, artillery, local-multiplayer, asynchronous-multiplayer, family-friendly, pwa, swedish
 **Omslag:** `cover-630x500.png` · Skärmdumpar: `screenshots/*.png` (genereras med `npm run shots`)

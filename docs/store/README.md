@@ -8,7 +8,7 @@ tre butiker i; Snäckschack har färre, och skälen står nedan.
 | `itch.md` | Sidtext för itch.io, svenska och engelska |
 | `cover-630x500.png` | Omslaget till itch, genereras med `npm run shots` |
 | `screenshots/` | Pressbilder på svenska, genereras med `npm run shots` |
-| `screenshots/en/`, `cover-630x500-en.png` | Samma bilder och omslag på engelska (`1-board`, `2-aim`, `3-checkmate`, `4-chaos`, `5-menu`, `6-wide`), `npm run shots -- en` |
+| `screenshots/en/`, `cover-630x500-en.png` | Samma bilder och omslag på engelska (`1-board`, `2-aim`, `3-checkmate`, `4-chaos`, `5-menu`, `6-wide`, `7-learn`), `npm run shots -- en` |
 | `../../icons/og-1200x630.png` | Delningsbilden (`og:image`), genereras med `npm run og:image` |
 
 ## Pressbilderna
@@ -21,6 +21,7 @@ tre butiker i; Snäckschack har färre, och skälen står nedan.
 | `4-kaos.png` | 1080 × 1920 | Kaos efter några dueller: sprickor i skalen och hälsostaplar |
 | `5-menyn.png` | 1080 × 1920 | Menyn med spellägena |
 | `6-bred.png` | 1280 × 720 | Brädet med draglistan, för butiker som vill ha liggande bild |
+| `7-lar-dig.png` | 1080 × 1920 | Lär dig schack: tornets tredje steg, tornet upplyft mot salladen |
 
 ## Bilderna genereras, de fotograferas inte
 

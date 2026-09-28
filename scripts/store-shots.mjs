@@ -23,7 +23,7 @@ const server = serve(port);
 const url = `http://localhost:${port}/?lang=${lang}`;
 const COVER = { sv: ['Snäckschack', 'Schack med sniglar'], en: ['Snail Chess', 'Chess with snails'] }[lang];
 
-const EN_NAMES = {"1-bradet.png":"1-board.png","2-sikta.png":"2-aim.png","3-schackmatt.png":"3-checkmate.png","4-kaos.png":"4-chaos.png","5-menyn.png":"5-menu.png","6-bred.png":"6-wide.png"};
+const EN_NAMES = {"1-bradet.png":"1-board.png","2-sikta.png":"2-aim.png","3-schackmatt.png":"3-checkmate.png","4-kaos.png":"4-chaos.png","5-menyn.png":"5-menu.png","6-bred.png":"6-wide.png","7-lar-dig.png":"7-learn.png"};
 const shot = async (page, name) => {
   if (lang === 'en') name = EN_NAMES[name];
   await page.waitForTimeout(400);
@@ -114,6 +114,24 @@ try {
   page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
   await stage(page, url);
   await shot(page, '6-bred.png');
+  await page.close();
+
+  // ---------- 7: learn chess, the rook eating its way round the board ----------
+  // The rook lesson played to its third step (the moves are the shortest ones),
+  // then the rook picked up so its lines to the lettuce show.
+  page = await phone(browser);
+  await menu(page, url);
+  await page.click('#btn-learn');
+  await page.click('.learn-item');
+  const step = async (moves) => {
+    for (const [from, to] of moves) { await tap(page, from); await tap(page, to); await page.waitForTimeout(150); }
+    await page.waitForSelector('#learn-next:not([hidden])');
+    await page.click('#learn-next');
+  };
+  await step([['a1', 'a7']]);
+  await step([['a1', 'a7'], ['a7', 'f7']]);
+  await tap(page, 'd4');
+  await shot(page, '7-lar-dig.png');
   await page.close();
 
   // ---------- the itch cover, 630x500 ----------

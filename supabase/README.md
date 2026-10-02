@@ -59,6 +59,16 @@ inte längre; motståndaren spelar upp inspelningen i stället (`hp_prev` ger
 kaos-duellen rätt hp att börja på). Gamla partier utan `duel` spelas upp från
 seedet som förut.
 
+## Push-prenumerationer
+
+`snailchess_push_subscriptions` med `snailchess_save_push/remove_push` är Snäckschacks egna
+(sedan 2026-10-02, som Snigelkrattan, Snail Story och Snailman). Den delade
+`snails_push_subscriptions` saknar spelkolumn, så notiser läckte mellan spelen.
+`snailchess_save_push` tar också bort samma endpoint ur den delade tabellen;
+`js/push.js` anropar den vid start, så gamla prenumerationer flyttas när
+Snäckschack öppnas. `chess-notify-turn` läser och städar bara den egna tabellen.
+Test: `tests/snailchess_push.sql`.
+
 ## Migrationer
 
 `migrations/*.sql` i filnamnsordning. Applicera med Supabase MCP

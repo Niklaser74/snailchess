@@ -1,6 +1,7 @@
 // Sends "your turn" push notifications for a Snäckschack Snigelpost match.
-// Sibling of snailmageddon's notify-turn: same Vault key, same subscription
-// table (snails_push_subscriptions), but its own match table and its own URL.
+// Sibling of snailmageddon's notify-turn: same Vault key, but its own
+// subscription table (snailchess_push_subscriptions: the shared one has no game column
+// and leaked between games), its own match table and its own URL.
 // Called by the client right after it has submitted a ply (or joined/resigned).
 // The gateway verifies the caller's JWT; this function checks that the caller
 // is in the match and notifies the other player only.
@@ -55,7 +56,7 @@ Deno.serve(async (req) => {
     const kind: Kind = ['joined', 'resigned', 'timeout', 'rematch'].includes(event) ? event : m.status === 'finished' ? 'finished' : 'turn';
     if (kind === 'turn' && m.turn === me) return json({ sent: 0, reason: 'still your turn' });
 
-    const subs = await (await rest(`snails_push_subscriptions?user_id=eq.${other}&select=endpoint,p256dh,auth,lang`)).json();
+    const subs = await (await rest(`snailchess_push_subscriptions?user_id=eq.${other}&select=endpoint,p256dh,auth,lang`)).json();
     if (!subs.length) return json({ sent: 0, reason: 'no subscriptions' });
 
     const jwkText = await (await rest('rpc/snails_vapid_private', { method: 'POST', body: '{}' })).json();
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
       if (status === 201 || status === 200) sent++;
       else if (status === 404 || status === 410) dead.push(s.endpoint);
     }
-    for (const e of dead) await rest(`snails_push_subscriptions?endpoint=eq.${encodeURIComponent(e)}`, { method: 'DELETE' });
+    for (const e of dead) await rest(`snailchess_push_subscriptions?endpoint=eq.${encodeURIComponent(e)}`, { method: 'DELETE' });
     return json({ sent, dead: dead.length });
   } catch (e) {
     return json({ error: String((e as Error).message || e) }, 500);

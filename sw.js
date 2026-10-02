@@ -1,6 +1,6 @@
 // Service worker: cache-first app shell so the game works offline.
 // Cache names are prefixed per game: everything on snails.se shares one origin.
-const VERSION = 'snailchess-v18';
+const VERSION = 'snailchess-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -35,8 +35,11 @@ const ASSETS = [
   './icons/icon-512-maskable.png',
 ];
 
+// cache: 'reload' fetches every file from the network. A plain addAll goes
+// through the browser's HTTP cache (GitHub Pages: max-age=600), so a new
+// version could be installed with files from the old one.
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

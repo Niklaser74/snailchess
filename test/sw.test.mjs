@@ -12,6 +12,7 @@ const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const version = sw.match(/const VERSION = '([^']+)'/)[1];
 assert.match(version, /^snailchess-v\d+$/, 'cache name must be prefixed snailchess-');
 assert.ok(sw.includes("k.startsWith('snailchess-')"), 'activate must only delete own caches');
+assert.ok(sw.includes("cache: 'reload'"), 'install must bypass the HTTP cache, or a new version can ship old files');
 
 const assets = [...sw.matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]).filter(Boolean);
 const missing = assets.filter((a) => !fs.existsSync(path.join(root, a)));

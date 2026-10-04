@@ -5,6 +5,24 @@ import { online } from './supa.js';
 
 export const snigelpost = {
   available() { return online.available(); },
+  signedIn() { return online.signedIn(); },
+  // The series profile name, if this browser already has an account — never
+  // creates one. "Snäcka" is the default the profile gets for an empty name,
+  // not a choice (the server's snailchess_profile_name says the same).
+  async profileName() {
+    if (!online.signedIn()) return '';
+    try { const n = String((await online.rpc('snails_profile'))?.name || '').trim().slice(0, 24); return n === 'Snäcka' ? '' : n; } catch { return ''; }
+  },
+  // A name typed in the game is the account's name: the server puts the
+  // profile name in every game whenever there is one (a trigger on the games
+  // table), so it is saved there, look untouched, and a trigger renames the
+  // player in the games already on the board. Only with an account.
+  async setName(name) {
+    if (!online.signedIn()) return false;
+    const p = await online.rpc('snails_profile');
+    await online.rpc('snails_profile_set', { p_name: String(name || '').trim().slice(0, 24), p_look: p?.look || {} });
+    return true;
+  },
   // bestOf 1, 3 or 5: every game belongs to a series; 1 is a single game
   create(name, mode, bestOf = 3) { return online.rpc('snailchess_create', { p_name: name, p_mode: mode, p_best_of: bestOf }); },
   // a new series against the same opponent (or the one already running between you)

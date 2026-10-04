@@ -720,10 +720,17 @@ $('online-list').addEventListener('click', async (e) => {
   if (e.target.closest('.mopen')) openMatch(row.dataset.id);
   else if (e.target.closest('.mdel')) { try { await snigelpost.remove(row.dataset.id); } catch (err) { onlineError(err); } refreshMatchList(); }
 });
-$('opt-name').value = store.get('name', '');
 $('opt-bestof').value = String(store.get('bestOf', 3));
 $('opt-bestof').addEventListener('change', () => store.set('bestOf', Number($('opt-bestof').value)));
-$('opt-name').addEventListener('change', () => store.set('name', $('opt-name').value.trim().slice(0, 24)));
+$('opt-name').value = store.get('name', '');
+$('opt-name').addEventListener('change', () => {
+  const n = $('opt-name').value.trim().slice(0, 24);
+  store.set('name', n);
+  if (n) snigelpost.setName(n).catch(() => { /* offline: the next game carries it */ });
+});
+// The account's name (snails.se/account/) wins: the server writes it into every
+// game, so the field shows it too. Fetched once per visit, never creates an account.
+if (snigelpost.available() && snigelpost.signedIn()) snigelpost.profileName().then((n) => { if (n) { store.set('name', n); $('opt-name').value = n; } });
 $('btn-online-create').addEventListener('click', async () => {
   readMenu();
   $('online-status').textContent = t('online.loading');

@@ -94,3 +94,21 @@ den aldrig här. `js/supa.js` re-exporterar den. Sessionen ligger under
 gäller alla spel); e-post/Google-koppling, namn och utseende sköts på
 https://snails.se/account/. Det är det enda undantaget från regeln att nycklar
 prefixas `snailchess.`.
+
+## Svitlistan (2026-10-04)
+
+Dagar i rad med ett avslutat parti (alla lägen) eller ett Snigelpost-drag, i
+svensk tid. Frivilligt: spelet räknar alltid sviten lokalt (`js/streak.js`,
+`snailchess.streakDays`). Den som trycker "Var med på svitlistan" får ett
+anonymt konto, och därifrån räknar servern.
+
+| Objekt | Vad |
+| --- | --- |
+| `snailchess_streakers` | de som är med: namn och bästa svit |
+| `snailchess_days` | en rad per spelad dag (drygt ett år sparas) |
+| `snailchess_streak_join/played/board/leave` | listan; `leave` raderar spelarens dagar |
+| `snailchess_streak_current(uid)` (intern) | dagar i rad som slutar i dag eller i går |
+| `snailchess_streak_leader()` | **öppen för anon**: längsta pågående svit (namn, antal dagar som `score`) och hur många som har en, för hubbens kort |
+
+Test: `tests/snailchess_streak.sql` och `test/streak.test.mjs` (lokal räkning,
+svensk tid, och att varje RPC finns i en migration med rättigheter).

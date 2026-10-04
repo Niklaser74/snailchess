@@ -128,10 +128,12 @@
     <div class="actions">
       <button id="btn-continue" class="btn secondary" hidden data-i18n="menu.continue">Fortsätt partiet</button>
       <button id="btn-start" class="btn primary" data-i18n="menu.start">Nytt parti</button>
+      <button id="btn-streak" class="btn secondary" data-i18n="streak.open">Svitlistan</button>
       <button id="btn-learn" class="btn secondary" data-i18n="learn.open">Lär dig schack</button>
       <button id="btn-help" class="btn secondary" data-i18n="menu.help">Så spelar du</button>
       <button id="btn-install" class="btn secondary" hidden data-i18n="menu.install">Installera app</button>
     </div>
+    <p id="streak-line" class="streak-line"></p>
     <p id="offline-hint" class="hint"></p>
     <section id="online" hidden>
       <h2 data-i18n="online.title">Snigelpost</h2>
@@ -157,6 +159,23 @@
 </div>
 
 <!-- Help -->
+<!-- Svitlistan -->
+<div id="streak" class="overlay" hidden>
+  <div class="panel small">
+    <h2 data-i18n="streak.title">Svitlistan</h2>
+    <p class="why" data-i18n="streak.blurb"></p>
+    <ul id="streak-list" class="streak-list"></ul>
+    <p id="streak-me" class="series-line"></p>
+    <p id="streak-name" class="hint"></p>
+    <p id="streak-status" class="hint"></p>
+    <div class="actions">
+      <button id="btn-streak-join" class="btn primary" data-i18n="streak.join">Var med på svitlistan</button>
+      <button id="btn-streak-leave" class="btn secondary" hidden data-i18n="streak.leave">Gå ur listan</button>
+      <button id="btn-streak-close" class="btn secondary" data-i18n="streak.close">Stäng</button>
+    </div>
+  </div>
+</div>
+
 <div id="help" class="overlay" hidden>
   <div class="panel">
     <h2 data-i18n="help.title">Så spelar du</h2>

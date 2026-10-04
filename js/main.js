@@ -11,6 +11,7 @@ import { snigelpost } from './online.js';
 import { push } from './push.js';
 import { getLang } from './i18n.js';
 import { createLearn } from './learn.js';
+import { streak } from './streak.js';
 
 const $ = (id) => document.getElementById(id);
 // Anything from the server goes through this before it reaches innerHTML: move
@@ -45,7 +46,7 @@ let selected = null;
 let duelCtl = null;
 
 setLang(detectLang());
-document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); refreshHud(); learn.refresh(); }));
+document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); refreshHud(); learn.refresh(); refreshStreakLine(); if (!$('streak').hidden) renderStreak(); }));
 
 const board = new Board($('board'));
 board.onSquare = onSquare;
@@ -85,6 +86,7 @@ function showMenu() {
   stopPolling();
   onlineMatch = null;
   refreshMatchList();
+  refreshStreakLine();
 }
 $('btn-start').addEventListener('click', () => { readMenu(); newGame(); });
 $('btn-continue').addEventListener('click', () => { readMenu(); if (!resumeGame()) newGame(); });
@@ -129,7 +131,7 @@ function refreshMute() {
 refreshMute();
 addEventListener('pointerdown', unlockAudio, { once: true });
 addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { if (!$('help').hidden) $('help').hidden = true; else if (!$('promo').hidden) return; else if (!busy && $('menu').hidden) showMenu(); }
+  if (e.key === 'Escape') { if (!$('help').hidden) $('help').hidden = true; else if (!$('streak').hidden) $('streak').hidden = true; else if (!$('promo').hidden) return; else if (!busy && $('menu').hidden) showMenu(); }
   if (e.key === 'z' && (e.ctrlKey || e.metaKey)) undo();
 });
 
@@ -336,6 +338,7 @@ async function afterMove(keepMessage = false) {
     over = true;
     save(); refreshHud(); renderMoves();
     if (onlineMatch) await submitPly();
+    else streak.markPlayed(playerName());
     return finish();
   }
   save();
@@ -839,6 +842,7 @@ async function submitPly() {
     onlineMatch = await snigelpost.submit(m, mine, chess.fen(), hp, result, lastDuel);
     store.set('seen.' + m.id, onlineMatch.ply_count);
     push.notify(m.id, over ? 'finished' : 'turn');
+    streak.markPlayed(playerName());   // a Snigelpost move counts the day
     if (!over) showWaiting();
   } catch (e) {
     $('hud-msg').textContent = t('online.error', { msg: e.message });
@@ -923,6 +927,66 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 // for browser tests and debugging
 window.snailchess = { get chess() { return chess; }, get board() { return board; }, get duel() { return duelCtl; }, get busy() { return busy; }, get match() { return onlineMatch; }, get events() { return events; } };
 
+// ---------- Svitlistan ----------
+// The streak line in the menu is this device's own count; the list is the server's.
+function refreshStreakLine() {
+  const n = streak.local();
+  const el = $('streak-line');
+  el.textContent = n > 1 ? t('streak.line', { n }) : n === 1 ? t('streak.line1') : t('streak.none');
+}
+let streakData = null;
+async function openStreak() {
+  $('streak').hidden = false;
+  streakData = null;
+  renderStreak();
+  try { streakData = streak.joined() ? await streak.board() : null; } catch { streakData = { error: true }; }
+  renderStreak();
+}
+// Rows with textContent only: the names come from other players.
+function renderStreak() {
+  const list = $('streak-list');
+  const joined = streak.joined();
+  $('streak-name').textContent = t(joined ? 'streak.joinedAs' : 'streak.notJoined', { name: playerName() });
+  $('btn-streak-join').hidden = joined || !snigelpost.available();
+  $('btn-streak-leave').hidden = !joined;
+  list.replaceChildren();
+  $('streak-me').textContent = '';
+  if (!joined) { $('streak-status').textContent = ''; list.hidden = true; return; }
+  list.hidden = false;
+  if (!streakData) { $('streak-status').textContent = t('streak.loading'); return; }
+  if (streakData.error) { $('streak-status').textContent = t('streak.error'); return; }
+  $('streak-status').textContent = streakData.top.length ? '' : t('streak.empty');
+  streakData.top.forEach((r, i) => {
+    const li = document.createElement('li');
+    li.className = 'mrow' + (r.me ? ' turn' : '');
+    const who = document.createElement('span'); who.className = 'mwho'; who.textContent = `${i + 1}. ${r.name}`;
+    const days = document.createElement('span'); days.className = 'mdays'; days.textContent = t('streak.days', { n: r.days });
+    li.append(who, days);
+    list.append(li);
+  });
+  const me = streakData.me;
+  if (me) $('streak-me').textContent = t(me.current === 1 ? 'streak.me1' : 'streak.me', { current: me.current, best: me.best }) + (me.rank ? ' · ' + t('streak.rank', { rank: me.rank, total: streakData.total }) : '');
+}
+$('btn-streak').addEventListener('click', openStreak);
+$('btn-streak-close').addEventListener('click', () => { $('streak').hidden = true; });
+$('btn-streak-join').addEventListener('click', async () => {
+  $('btn-streak-join').disabled = true;
+  try { await streak.join(playerName()); streakData = await streak.board(); } catch { streakData = { error: true }; }
+  $('btn-streak-join').disabled = false;
+  renderStreak();
+});
+$('btn-streak-leave').addEventListener('click', async () => {
+  if (!confirm(t('streak.leaveConfirm'))) return;
+  try { await streak.leave(); } catch { /* still off the list locally */ }
+  streakData = null;
+  renderStreak();
+});
+
 showMenu();
-const joinId = new URLSearchParams(location.search).get('match');
-if (joinId) { history.replaceState(null, '', location.pathname); openMatch(joinId); }
+{
+  const q = new URLSearchParams(location.search);
+  const joinId = q.get('match');
+  if (joinId || q.has('streak')) history.replaceState(null, '', location.pathname);
+  if (joinId) openMatch(joinId);
+  else if (q.has('streak')) openStreak();
+}
